@@ -1,0 +1,180 @@
+/* 
+=========================================
+RETENTION CORE V3.0 MASTER CSS OVERRIDE
+=========================================
+*/
+
+:root {
+    --bg-black: #000000;
+    --surface-dark: #111111;
+    --border-charcoal: #222222;
+    --neon-violet: #6366f1;
+    --success-green: #00b954;
+    --error-red: #ff5449;
+    --text-white: #ffffff;
+    --text-muted: #94a3b8;
+    --font-heading: 'Hanken Grotesk', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+}
+
+/* Base DOM Resets */
+.stApp {
+    background-color: var(--bg-black) !important;
+    font-family: var(--font-heading) !important;
+}
+
+.css-1d391kg, .stSidebar {
+    background-color: var(--surface-dark) !important;
+    border-right: 1px solid var(--border-charcoal) !important;
+}
+
+/* Master Grid Structure */
+.block-container {
+    padding-top: 2rem !important;
+    max-width: 1400px !important;
+}
+
+/* Custom CSS classes for HTML wrappers */
+.hero-block {
+    background: var(--surface-dark);
+    border: 1px solid var(--border-charcoal);
+    border-left: 4px solid var(--error-red);
+    padding: 24px;
+    border-radius: 8px;
+    margin-bottom: 32px;
+    transition: all 0.3s ease;
+}
+
+.hero-block:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(255, 84, 73, 0.15);
+    border-color: var(--error-red);
+}
+
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 20px;
+    margin-bottom: 32px;
+}
+
+.kpi-card {
+    background: var(--surface-dark);
+    border: 1px solid var(--border-charcoal);
+    padding: 20px;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.kpi-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 30px rgba(99, 102, 241, 0.2);
+    border-color: var(--neon-violet);
+}
+
+.kpi-title {
+    color: var(--text-muted);
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+}
+
+.kpi-value {
+    color: var(--text-white);
+    font-size: 32px;
+    font-weight: 700;
+    font-family: var(--font-mono);
+}
+
+.kpi-trend-up { color: var(--success-green); font-size: 14px; font-weight: 600; }
+.kpi-trend-down { color: var(--error-red); font-size: 14px; font-weight: 600; }
+
+/* Custom Forensic Table */
+.forensic-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--surface-dark);
+    border: 1px solid var(--border-charcoal);
+    font-size: 14px;
+    margin-top: 16px;
+    margin-bottom: 32px;
+}
+
+.forensic-table th {
+    text-align: left;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-charcoal);
+    color: var(--text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+}
+
+.forensic-table td {
+    padding: 16px;
+    border-bottom: 1px solid var(--border-charcoal);
+    color: var(--text-white);
+}
+
+.forensic-table tr:hover {
+    background: rgba(99, 102, 241, 0.05);
+}
+
+.forensic-table td.mono {
+    font-family: var(--font-mono);
+}
+
+.badge-crimson {
+    background: rgba(255, 84, 73, 0.15);
+    color: var(--error-red);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-weight: bold;
+    font-size: 12px;
+}
+
+.badge-protocol {
+    background: rgba(99, 102, 241, 0.15);
+    color: var(--neon-violet);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 12px;
+}
+
+/* Route Ledger Button Override */
+.stButton>button {
+    background: var(--bg-black) !important;
+    color: var(--neon-violet) !important;
+    border: 1px solid var(--neon-violet) !important;
+    transition: all 0.3s ease !important;
+    width: 100%;
+}
+
+.stButton>button:hover {
+    transform: translateY(-4px) !important;
+    box-shadow: 0 8px 30px rgba(99, 102, 241, 0.3) !important;
+    background: rgba(99, 102, 241, 0.1) !important;
+    color: var(--text-white) !important;
+}
+
+/* Security Audit Trail Terminal */
+.audit-terminal {
+    background: #050505;
+    border: 1px solid var(--border-charcoal);
+    border-radius: 4px;
+    padding: 12px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--success-green);
+    height: 150px;
+    overflow-y: auto;
+    margin-top: 16px;
+}
+.audit-line {
+    margin-bottom: 4px;
+    opacity: 0.9;
+}

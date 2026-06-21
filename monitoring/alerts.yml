@@ -1,0 +1,80 @@
+groups:
+  - name: retention_core_alerts
+    interval: 60s
+    rules:
+      # ── Section 7.5: Drift Alert ────────────────────────────────────────────
+      - alert: SevereDriftDetected
+        expr: retention_drift_psi > 0.25
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Severe feature drift detected for tenant {{ $labels.tenant_id }}"
+          description: |
+            Feature '{{ $labels.feature_name }}' for tenant {{ $labels.tenant_id }}
+            has PSI = {{ $value | printf "%.4f" }}, which exceeds the severe threshold (0.25).
+            Emergency retraining has been triggered automatically.
+
+      # ── Churn Score Surge ────────────────────────────────────────────────────
+      - alert: ChurnScoreSurge
+        expr: >
+          increase(retention_predictions_total{risk_band="high"}[1h]) >
+          (increase(retention_predictions_total[1h]) * 0.40)
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High churn risk surge for tenant {{ $labels.tenant_id }}"
+          description: >
+            More than 40% of predictions in the last hour are high-risk for
+            tenant {{ $labels.tenant_id }}. Review feature distributions.
+
+      # ── Campaign Queue Backlog ───────────────────────────────────────────────
+      - alert: CampaignQueueBacklog
+        expr: retention_campaign_queue_pending > 100
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Campaign approval queue has {{ $value }} pending items (tenant {{ $labels.tenant_id }})"
+          description: >
+            More than 100 campaigns are pending approval for over 30 minutes.
+            Check if the auto-approve task is running.
+
+      # ── API High Error Rate ──────────────────────────────────────────────────
+      - alert: HighAPIErrorRate
+        expr: >
+          rate(http_requests_total{status=~"5.."}[5m]) /
+          rate(http_requests_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "API error rate above 5%"
+          description: >
+            The FastAPI application has a 5xx error rate of {{ $value | humanizePercentage }}
+            over the last 5 minutes. Check application logs.
+
+      # ── Memory Ceiling ───────────────────────────────────────────────────────
+      - alert: HighMemoryUsage
+        expr: retention_memory_usage_bytes > 2.5e9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Process memory usage approaching 2.5GB DuckDB ceiling"
+          description: >
+            Current memory usage is {{ $value | humanize1024 }}B.
+            DuckDB ceiling is 2.5GB. Risk of disk spill or OOM.
+
+      # ── Model AUC Drop ───────────────────────────────────────────────────────
+      - alert: ModelAUCDrop
+        expr: retention_model_auc < 0.65
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Active model AUC below 0.65 for tenant {{ $labels.tenant_id }}"
+          description: >
+            Model version {{ $labels.model_version }} for tenant {{ $labels.tenant_id }}
+            has AUC = {{ $value | printf "%.4f" }}. Consider triggering a manual retrain.

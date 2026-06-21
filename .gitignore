@@ -1,0 +1,21 @@
+# Environments
+.env
+.env.production
+.env.development
+.env.test
+
+# SQLite databases
+*.db
+*.db-shm
+*.db-wal
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+*.log
+
+# Misc
+.DS_Store

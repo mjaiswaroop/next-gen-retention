@@ -1,0 +1,66 @@
+# ─── Core Data & ML ────────────────────────────────────────────────────────
+pandas>=2.0
+numpy>=1.24
+scikit-learn>=1.3
+xgboost>=2.0
+joblib>=1.3
+matplotlib>=3.7
+scipy>=1.11           # chi-squared tests, Jensen-Shannon divergence
+shap>=0.44            # Section 1.3: Model explainability
+
+# ─── API & Backend ─────────────────────────────────────────────────────────
+fastapi>=0.104
+uvicorn[standard]>=0.24
+pydantic>=2.0
+pydantic-settings>=2.0.0
+slowapi>=0.1.9
+anyio>=4.0            # async thread offloading (anyio.to_thread.run_sync)
+google-genai>=0.2.0
+
+# ─── Database ──────────────────────────────────────────────────────────────
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.0
+alembic>=1.13.0
+
+# ─── Auth & Security ───────────────────────────────────────────────────────
+python-jose[cryptography]
+passlib[bcrypt]
+cryptography>=42.0    # Section 3.2: Fernet PII encryption
+
+# ─── Async Task Queue ──────────────────────────────────────────────────────
+celery>=5.3           # Background jobs (retraining, campaigns, digests)
+redis>=5.0            # Celery broker + result backend
+
+# ─── Streaming ─────────────────────────────────────────────────────────────
+confluent-kafka>=2.3  # Section 2.1: Kafka/Redpanda consumer
+
+# ─── Dashboard ─────────────────────────────────────────────────────────────
+streamlit>=1.28
+plotly>=5.18
+st-aggrid>=0.3.4
+
+# ─── Observability ─────────────────────────────────────────────────────────
+structlog>=24.1       # Section 7.1: Structured JSON logging
+prometheus-client>=0.20         # Section 7.2: Custom metrics
+prometheus-fastapi-instrumentator>=0.2  # FastAPI auto-instrumentation
+opentelemetry-sdk>=1.24         # Section 7.3: Distributed tracing
+opentelemetry-instrumentation-fastapi>=0.45b0
+opentelemetry-exporter-otlp>=1.24      # Jaeger OTLP export
+
+# ─── Outreach Channels ─────────────────────────────────────────────────────
+sendgrid>=6.11        # Section 4.2: Email delivery
+twilio>=8.0           # Section 4.2: SMS delivery
+
+# ─── CRM Integrations ──────────────────────────────────────────────────────
+simple-salesforce>=1.12  # Section 6.1: Salesforce connector
+stripe>=7.0              # Section 6.2: Stripe webhook handling
+
+# ─── PDF Generation ────────────────────────────────────────────────────────
+reportlab>=4.0        # Section 3.1: Erasure certificates, Section 9.4: Reports
+
+# ─── Utilities ─────────────────────────────────────────────────────────────
+python-dotenv>=1.0.0
+tenacity>=8.0.0
+requests>=2.31
+httpx>=0.27           # async HTTP for outbound webhooks
+python-multipart      # FastAPI form data

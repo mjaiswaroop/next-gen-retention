@@ -1,0 +1,97 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: retention-core-worker
+  namespace: retention-core
+  labels:
+    app: retention-core-worker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: retention-core-worker
+  template:
+    metadata:
+      labels:
+        app: retention-core-worker
+    spec:
+      containers:
+        - name: celery-worker
+          image: retention-core:3.0.0
+          command: ["celery", "-A", "tasks.celery_app", "worker", "--loglevel=info", "--concurrency=4"]
+          env:
+            - name: REDIS_URL
+              value: "redis://redis-service:6379/0"
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: "redpanda-service:9092"
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: retention-core-secrets
+                  key: secret-key
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: retention-core-secrets
+                  key: database-url
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
+          volumeMounts:
+            - name: model-storage
+              mountPath: /app/models
+            - name: data-storage
+              mountPath: /app/data
+      volumes:
+        - name: model-storage
+          persistentVolumeClaim:
+            claimName: model-pvc
+        - name: data-storage
+          persistentVolumeClaim:
+            claimName: data-pvc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: retention-core-beat
+  namespace: retention-core
+  labels:
+    app: retention-core-beat
+spec:
+  replicas: 1   # MUST be 1 — only one beat scheduler per cluster
+  selector:
+    matchLabels:
+      app: retention-core-beat
+  template:
+    metadata:
+      labels:
+        app: retention-core-beat
+    spec:
+      containers:
+        - name: celery-beat
+          image: retention-core:3.0.0
+          command: ["celery", "-A", "tasks.celery_app", "beat", "--loglevel=info"]
+          env:
+            - name: REDIS_URL
+              value: "redis://redis-service:6379/0"
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: retention-core-secrets
+                  key: secret-key
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: retention-core-secrets
+                  key: database-url
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"

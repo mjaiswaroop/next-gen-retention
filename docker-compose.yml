@@ -1,0 +1,279 @@
+version: '3.8'
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Retention Core v3.0 — Full Enterprise Docker Compose
+# Services: api, dashboard, celery-worker, celery-beat, redis,
+#           redpanda (Kafka), prometheus, grafana, jaeger
+# Start all:  docker-compose up
+# ─────────────────────────────────────────────────────────────────────────────
+
+x-common-env: &common-env
+  SECRET_KEY: ${SECRET_KEY:-dev_secret_change_in_prod}
+  DATABASE_URL: ${DATABASE_URL:-postgresql://retention:retention@postgres:5432/retention_core}
+  ANALYTICS_DB_PATH: /app/data/analytics.duckdb
+  REDIS_URL: redis://redis:6379/0
+  KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
+  GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+  SENDGRID_API_KEY: ${SENDGRID_API_KEY:-}
+  SENDGRID_FROM_EMAIL: ${SENDGRID_FROM_EMAIL:-noreply@retentioncore.io}
+  TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+  TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+  SALESFORCE_USERNAME: ${SALESFORCE_USERNAME:-}
+  SALESFORCE_PASSWORD: ${SALESFORCE_PASSWORD:-}
+  SALESFORCE_SECURITY_TOKEN: ${SALESFORCE_SECURITY_TOKEN:-}
+  HUBSPOT_ACCESS_TOKEN: ${HUBSPOT_ACCESS_TOKEN:-}
+  STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+  ZENDESK_SUBDOMAIN: ${ZENDESK_SUBDOMAIN:-}
+  ZENDESK_EMAIL: ${ZENDESK_EMAIL:-}
+  ZENDESK_TOKEN: ${ZENDESK_TOKEN:-}
+  JAEGER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
+  OTEL_SERVICE_NAME: retention-core-api
+  ENVIRONMENT: ${ENVIRONMENT:-development}
+
+services:
+  # ── FastAPI Application ─────────────────────────────────────────────────────
+  api:
+    build: .
+    container_name: retention_core_api
+    command: >
+      python -m uvicorn app:app
+      --host 0.0.0.0 --port 8000
+      --workers 2
+      --log-level info
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+      - duckdb_data:/app/data
+      - model_artifacts:/app/models
+      - reports_data:/app/reports
+    environment:
+      <<: *common-env
+      PORT: 8000
+    depends_on:
+      - redis
+      - redpanda
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
+  # ── Streamlit Dashboard ─────────────────────────────────────────────────────
+  dashboard:
+    build: .
+    container_name: retention_core_dashboard
+    command: >
+      python -m streamlit run dashboard.py
+      --server.port 8501
+      --server.address 0.0.0.0
+      --server.headless true
+      --server.enableCORS false
+    ports:
+      - "8501:8501"
+    volumes:
+      - .:/app
+      - duckdb_data:/app/data
+    environment:
+      <<: *common-env
+      API_BASE: http://api:8000
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  # ── Celery Worker ───────────────────────────────────────────────────────────
+  celery-worker:
+    build: .
+    container_name: retention_core_worker
+    command: >
+      celery -A tasks.celery_app worker
+      --loglevel=info
+      --concurrency=4
+      -Q celery,ml_tasks,campaign_tasks,integration_tasks
+    volumes:
+      - .:/app
+      - duckdb_data:/app/data
+      - model_artifacts:/app/models
+    environment:
+      <<: *common-env
+    depends_on:
+      - redis
+      - api
+    restart: unless-stopped
+
+  # ── Celery Beat Scheduler ───────────────────────────────────────────────────
+  celery-beat:
+    build: .
+    container_name: retention_core_beat
+    command: >
+      celery -A tasks.celery_app beat
+      --loglevel=info
+      --scheduler celery.beat:PersistentScheduler
+    volumes:
+      - .:/app
+      - duckdb_data:/app/data
+    environment:
+      <<: *common-env
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  # ── Data Simulator ──────────────────────────────────────────────────────────
+  simulator:
+    build: .
+    container_name: retention_core_simulator
+    command: python scripts/data_simulator.py
+    volumes:
+      - .:/app
+      - duckdb_data:/app/data
+    environment:
+      <<: *common-env
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  # ── PostgreSQL Database ─────────────────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: retention_core_postgres
+    environment:
+      POSTGRES_USER: retention
+      POSTGRES_PASSWORD: retention
+      POSTGRES_DB: retention_core
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U retention"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ── Redis (Celery Broker + Backend) ────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: retention_core_redis
+    ports:
+      - "6379:6379"
+    command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  # ── Redpanda (Kafka-Compatible Broker) ─────────────────────────────────────
+  redpanda:
+    image: redpandadata/redpanda:latest
+    container_name: retention_core_redpanda
+    command:
+      - redpanda start
+      - --overprovisioned
+      - --smp 1
+      - --memory 512M
+      - --reserve-memory 0M
+      - --node-id 0
+      - --check=false
+      - --kafka-addr 0.0.0.0:9092
+      - --advertise-kafka-addr redpanda:9092
+      - --pandaproxy-addr 0.0.0.0:8082
+      - --advertise-pandaproxy-addr localhost:8082
+    ports:
+      - "9092:9092"
+      - "8082:8082"
+      - "9644:9644"
+    volumes:
+      - redpanda_data:/var/lib/redpanda/data
+    healthcheck:
+      test: ["CMD", "rpk", "cluster", "info"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  # ── Redpanda Console (Kafka UI) ────────────────────────────────────────────
+  redpanda-console:
+    image: redpandadata/console:latest
+    container_name: retention_core_console
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_BROKERS: redpanda:9092
+    depends_on:
+      - redpanda
+    restart: unless-stopped
+
+  # ── Prometheus ──────────────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: retention_core_prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.console.libraries=/etc/prometheus/console_libraries
+      - --web.console.templates=/etc/prometheus/consoles
+      - --storage.tsdb.retention.time=30d
+      - --web.enable-lifecycle
+    restart: unless-stopped
+
+  # ── Grafana ─────────────────────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:latest
+    container_name: retention_core_grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-retentioncore}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+  # ── Jaeger (Distributed Tracing) ────────────────────────────────────────────
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: retention_core_jaeger
+    ports:
+      - "16686:16686"   # Jaeger UI
+      - "4317:4317"     # OTLP gRPC
+      - "4318:4318"     # OTLP HTTP
+      - "6831:6831/udp" # Jaeger thrift UDP
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    restart: unless-stopped
+
+volumes:
+  duckdb_data:
+    driver: local
+  model_artifacts:
+    driver: local
+  reports_data:
+    driver: local
+  redis_data:
+    driver: local
+  postgres_data:
+    driver: local
+  redpanda_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
