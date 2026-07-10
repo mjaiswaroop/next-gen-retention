@@ -15,7 +15,7 @@ client = TestClient(app)
 def setup_test_merchant():
     """Ensure a test merchant exists in the SQLite database."""
     db = SessionLocal()
-    merchant = db.query(Merchant).filter_by(name="Test Merchant").first()
+    merchant = db.query(Merchant).execution_options(skip_tenant_check=True).filter_by(name="Test Merchant").first()
     if not merchant:
         merchant = Merchant(name="Test Merchant", is_active=True, api_key="dummy")
         db.add(merchant)

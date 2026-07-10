@@ -21,6 +21,9 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 from database import Base
 
+class MultiTenantModelMixin:
+    """Marker class for models that should have automatic tenant segregation."""
+    pass
 
 def utc_now():
     return datetime.now(timezone.utc)
@@ -54,7 +57,7 @@ class Merchant(Base):
     tenant_config   = relationship("TenantConfig", back_populates="merchant", uselist=False, cascade="all, delete-orphan")
 
 
-class Customer(Base):
+class Customer(Base, MultiTenantModelMixin):
     __tablename__ = "customers"
 
     id                     = Column(Integer, primary_key=True)
@@ -86,7 +89,7 @@ class Customer(Base):
     )
 
 
-class EventLog(Base):
+class EventLog(Base, MultiTenantModelMixin):
     __tablename__ = "event_logs"
 
     id          = Column(Integer, primary_key=True)
@@ -109,7 +112,7 @@ class EventLog(Base):
 # SECTION 3: Compliance — Immutable Audit Log
 # ─────────────────────────────────────────────────────────────────────────────
 
-class AuditLog(Base):
+class AuditLog(Base, MultiTenantModelMixin):
     """
     Immutable append-only log. Application layer must never allow UPDATE/DELETE.
     Covers: login, model_promoted, customer_erased, campaign_sent,
@@ -138,7 +141,7 @@ class AuditLog(Base):
 # SECTION 1: ML Model Registry
 # ─────────────────────────────────────────────────────────────────────────────
 
-class ModelRegistry(Base):
+class ModelRegistry(Base, MultiTenantModelMixin):
     """
     Tracks every trained XGBoost artifact per tenant.
     Only one row per tenant can have is_active=True at a time.
@@ -170,7 +173,7 @@ class ModelRegistry(Base):
 # SECTION 1.2: Data Drift Log
 # ─────────────────────────────────────────────────────────────────────────────
 
-class DriftLog(Base):
+class DriftLog(Base, MultiTenantModelMixin):
     """
     PSI and Jensen-Shannon divergence per feature per tenant.
     drift_level: 'stable' | 'moderate' | 'severe'
@@ -197,7 +200,7 @@ class DriftLog(Base):
 # SECTION 1.3: SHAP Values
 # ─────────────────────────────────────────────────────────────────────────────
 
-class ShapValue(Base):
+class ShapValue(Base, MultiTenantModelMixin):
     """
     Stores per-customer SHAP feature attributions for top at-risk users.
     Used by dashboard "Why is this customer at risk?" panel and RAG context.
@@ -223,7 +226,7 @@ class ShapValue(Base):
 # SECTION 1.4: A/B Experiment Framework
 # ─────────────────────────────────────────────────────────────────────────────
 
-class ExperimentAssignment(Base):
+class ExperimentAssignment(Base, MultiTenantModelMixin):
     """
     Records which A/B group each at-risk customer was assigned to.
     outcome fields populated after 30 days by the chi-squared evaluation task.
@@ -251,7 +254,7 @@ class ExperimentAssignment(Base):
     )
 
 
-class ExperimentResult(Base):
+class ExperimentResult(Base, MultiTenantModelMixin):
     """
     Aggregated chi-squared test results per tenant campaign experiment round.
     auto_promoted=True means the winning template was applied to future campaigns.
@@ -273,7 +276,7 @@ class ExperimentResult(Base):
     created_at       = Column(DateTime(timezone=True), default=utc_now)
 
 
-class InterventionExperiment(Base):
+class InterventionExperiment(Base, MultiTenantModelMixin):
     """
     Tracks causal interventions to validate if they actually reduced churn over 30 days.
     """
@@ -299,7 +302,7 @@ class InterventionExperiment(Base):
 # SECTION 5: RBAC — Users & API Keys
 # ─────────────────────────────────────────────────────────────────────────────
 
-class User(Base):
+class User(Base, MultiTenantModelMixin):
     """
     Platform users with role-based access.
     Roles: SUPER_ADMIN, TENANT_ADMIN, ANALYST, CAMPAIGN_MANAGER, PII_VIEWER
@@ -324,7 +327,7 @@ class User(Base):
     )
 
 
-class ApiKey(Base):
+class ApiKey(Base, MultiTenantModelMixin):
     """
     Scoped API keys managed by TENANT_ADMIN.
     Scopes: read_only | campaign_trigger | data_ingest (stored as JSON array)
@@ -353,7 +356,7 @@ class ApiKey(Base):
 # SECTION 3: Compliance — Erasure Certificate & Tenant Config
 # ─────────────────────────────────────────────────────────────────────────────
 
-class ErasureCertificate(Base):
+class ErasureCertificate(Base, MultiTenantModelMixin):
     """
     Immutable record of a GDPR/CCPA right-to-erasure action.
     """
@@ -369,7 +372,7 @@ class ErasureCertificate(Base):
     created_at        = Column(DateTime(timezone=True), default=utc_now)
 
 
-class TenantConfig(Base):
+class TenantConfig(Base, MultiTenantModelMixin):
     """
     Per-tenant configuration: PII registry, data residency, auto-approve hours, etc.
     """
@@ -395,7 +398,7 @@ class TenantConfig(Base):
 # SECTION 8: Contagion Graph
 # ─────────────────────────────────────────────────────────────────────────────
 
-class CustomerEdge(Base):
+class CustomerEdge(Base, MultiTenantModelMixin):
     """
     Stores explicit and inferred relationships between customers.
     """
@@ -422,7 +425,7 @@ class CustomerEdge(Base):
 # SECTION 4: Campaign Governance
 # ─────────────────────────────────────────────────────────────────────────────
 
-class CampaignQueue(Base):
+class CampaignQueue(Base, MultiTenantModelMixin):
     """
     Human-in-the-loop approval queue for all outgoing win-back campaigns.
     Status flow: pending → approved/rejected/auto_approved
@@ -454,7 +457,7 @@ class CampaignQueue(Base):
     )
 
 
-class CustomerPreferences(Base):
+class CustomerPreferences(Base, MultiTenantModelMixin):
     """
     Per-customer channel preferences and opt-out flags.
     """
@@ -472,7 +475,7 @@ class CustomerPreferences(Base):
     customer = relationship("Customer", back_populates="preferences")
 
 
-class CampaignEvent(Base):
+class CampaignEvent(Base, MultiTenantModelMixin):
     """
     Tracks every campaign lifecycle event: sent, opened, clicked, unsubscribed.
     Used for send-time optimisation (compute best hour/day per customer).
@@ -497,7 +500,7 @@ class CampaignEvent(Base):
 # SECTION 6: Integration Layer
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TenantIntegration(Base):
+class TenantIntegration(Base, MultiTenantModelMixin):
     """
     Stores which integrations are enabled per tenant and their encrypted config.
     Config values are JSON; secrets come from env vars (never stored here).
@@ -520,7 +523,7 @@ class TenantIntegration(Base):
     )
 
 
-class WebhookDeliveryLog(Base):
+class WebhookDeliveryLog(Base, MultiTenantModelMixin):
     """
     Outbound webhook delivery attempts with retry tracking.
     """
@@ -542,7 +545,7 @@ class WebhookDeliveryLog(Base):
         Index("ix_webhook_tenant_event", "tenant_id", "event_type"),
     )
 
-class AgentSession(Base):
+class AgentSession(Base, MultiTenantModelMixin):
     """
     Stores logs and transcripts for autonomous agent sessions (websockets).
     """
@@ -558,7 +561,7 @@ class AgentSession(Base):
         Index("ix_agent_sessions_tenant", "tenant_id"),
     )
 
-class AgentActionRegistry(Base):
+class AgentActionRegistry(Base, MultiTenantModelMixin):
     """
     Whitelist of permitted actions for the autonomous agent.
     """
@@ -575,7 +578,7 @@ class AgentActionRegistry(Base):
         UniqueConstraint("tenant_id", "action_type", name="uq_agent_action_type"),
     )
 
-class AgentActionLog(Base):
+class AgentActionLog(Base, MultiTenantModelMixin):
     """
     Audit log of all actions proposed or executed by the autonomous agent.
     """
@@ -597,7 +600,7 @@ class AgentActionLog(Base):
         Index("ix_agent_action_logs_tenant", "tenant_id"),
     )
 
-class ChurnForensicsReport(Base):
+class ChurnForensicsReport(Base, MultiTenantModelMixin):
     """
     Auto-generated post-mortem report for churned customers.
     """
@@ -621,7 +624,7 @@ class ChurnForensicsReport(Base):
         Index("ix_churn_forensics_verdict", "tenant_id", "verdict"),
     )
 
-class CounterfactualPath(Base):
+class CounterfactualPath(Base, MultiTenantModelMixin):
     __tablename__ = "counterfactual_paths"
     id = Column(Integer, primary_key=True)
     tenant_id = Column(Integer, ForeignKey("merchants.id"), nullable=False)
@@ -633,7 +636,7 @@ class CounterfactualPath(Base):
     created_at = Column(DateTime(timezone=True), default=utc_now)
 
 
-class LedgerEntryModel(Base):
+class LedgerEntryModel(Base, MultiTenantModelMixin):
     __tablename__ = 'negotiation_ledger'
     id = Column(Integer, primary_key=True)
     tenant_id = Column(Integer, ForeignKey('merchants.id'), nullable=False)

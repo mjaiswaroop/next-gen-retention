@@ -1,7 +1,46 @@
+import contextvars
 from sqlalchemy import create_engine, event
-from sqlalchemy.orm import sessionmaker, DeclarativeBase
+from sqlalchemy.orm import sessionmaker, DeclarativeBase, Session, with_loader_criteria
 from sqlalchemy.pool import NullPool, QueuePool
 from config import settings
+
+# Thread-safe global tenant context
+active_tenant_id: contextvars.ContextVar[int] = contextvars.ContextVar("active_tenant_id", default=None)
+
+@event.listens_for(Session, "do_orm_execute")
+def receive_do_orm_execute(execute_state):
+    # Only enforce if we're not running internal setup or migrations
+    if execute_state.execution_options.get("skip_tenant_check", False):
+        return
+        
+    tenant = active_tenant_id.get()
+    if tenant is None:
+        raise PermissionError("Security Violation: No active tenant context established.")
+
+    # Apply global filtering to all models inheriting from MultiTenantModelMixin
+    if execute_state.is_select:
+        from models import MultiTenantModelMixin
+        execute_state.statement = execute_state.statement.options(
+            with_loader_criteria(
+                MultiTenantModelMixin,
+                lambda cls: getattr(cls, 'tenant_id', getattr(cls, 'merchant_id', None)) == tenant,
+                include_aliases=True,
+                propagate_to_loaders=True
+            )
+        )
+
+@event.listens_for(Session, "before_flush")
+def _enforce_tenant_integrity(session, flush_context, instances):
+    tenant = active_tenant_id.get()
+    if tenant is None:
+        return # Setup/migrations might flush without tenant
+        
+    from models import MultiTenantModelMixin
+    for obj in session.new | session.dirty:
+        if isinstance(obj, MultiTenantModelMixin):
+            obj_tenant = getattr(obj, 'tenant_id', getattr(obj, 'merchant_id', None))
+            if obj_tenant is not None and obj_tenant != tenant:
+                raise ValueError(f"Security Violation: Tenant ID mismatch on database write. Expected {tenant}, got {obj_tenant}")
 
 def build_engine():
     """

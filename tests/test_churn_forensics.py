@@ -5,12 +5,14 @@ from database import SessionLocal
 from services.forensics_service import generate_forensics_report, get_tenant_forensics_summary
 
 def test_churn_forensics():
+    from database import active_tenant_id
     db = SessionLocal()
     tenant_id = 1001
+    active_tenant_id.set(tenant_id)
     
     try:
         # 1. Setup Merchant and Customers
-        merchant = Merchant(id=tenant_id, name="Test Merchant", api_key="test_key_1001")
+        merchant = Merchant(id=tenant_id, name=f"Test Merchant {tenant_id}", api_key=f"test_key_{tenant_id}")
         db.add(merchant)
         
         c1 = Customer(merchant_id=tenant_id, user_id="cust_1", churn_probability=0.9, monetary_value=100.0, recency_days=10, frequency=5)

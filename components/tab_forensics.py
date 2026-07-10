@@ -47,16 +47,14 @@ def render(tenant_id: int):
     if analyze_btn:
         with st.spinner("Extracting themes from Vector DB..."):
             try:
-                rag_resp = requests.get(f"{API_BASE}/api/v1/forensics/semantic_insights", headers=headers)
+                rag_resp = requests.get(f"{API_BASE}/api/v1/forensics/semantic_insights", headers=headers, stream=True)
                 if rag_resp.status_code == 200:
-                    insights = rag_resp.json().get("insights", [])
-                    if not insights:
-                        st.info("No insights found.")
-                    else:
-                        for i, ins in enumerate(insights):
-                            color = "red" if ins['severity'].lower() == 'critical' else "orange" if ins['severity'].lower() == 'high' else "blue"
-                            st.markdown(f"**<span style='color:{color}'>{ins['severity'].upper()}</span> | {ins['theme']} ({ins['percentage']})**", unsafe_allow_html=True)
-                            st.write(ins['description'])
+                    def insight_stream():
+                        for chunk in rag_resp.iter_content(chunk_size=1024, decode_unicode=True):
+                            if chunk:
+                                yield chunk
+                    
+                    st.write_stream(insight_stream())
                 else:
                     st.error("Failed to load insights.")
             except Exception as e:

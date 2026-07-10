@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from auth import require_role
+from api.dependencies import RateLimiter
 from services.campaign_optimizer import CampaignOptimizerService
 
 router = APIRouter()
@@ -15,7 +16,7 @@ class GenerateVariantsRequest(BaseModel):
     base_prompt: str
     target_audience: str
 
-@router.post("/generate", dependencies=[Depends(require_role("SUPER_ADMIN", "TENANT_ADMIN", "CAMPAIGN_MANAGER"))])
+@router.post("/generate", dependencies=[Depends(require_role("SUPER_ADMIN", "TENANT_ADMIN", "CAMPAIGN_MANAGER")), Depends(RateLimiter(20))])
 def generate_variants(req: GenerateVariantsRequest, db: Session = Depends(get_db)):
     service = CampaignOptimizerService(db)
     variants = service.generate_variants(req.base_prompt, req.target_audience)

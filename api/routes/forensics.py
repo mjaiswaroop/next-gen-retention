@@ -2,16 +2,17 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database import get_db
 from auth import get_current_user, require_role
+from api.dependencies import RateLimiter
 from services.forensics_service import generate_forensics_report, get_tenant_forensics_summary
 from models import ChurnForensicsReport
+from fastapi.responses import StreamingResponse
 
 router = APIRouter(tags=["forensics"])
 
-@router.get("/semantic_insights", dependencies=[Depends(require_role("SUPER_ADMIN", "TENANT_ADMIN", "ANALYST"))])
+@router.get("/semantic_insights", dependencies=[Depends(require_role("SUPER_ADMIN", "TENANT_ADMIN", "ANALYST")), Depends(RateLimiter(20))])
 def get_semantic_insights():
-    from services.rag_service import analyze_churn_logs
-    insights = analyze_churn_logs()
-    return {"insights": insights}
+    from services.rag_service import analyze_churn_logs_stream
+    return StreamingResponse(analyze_churn_logs_stream(), media_type="text/event-stream")
 
 @router.get("/summary", dependencies=[Depends(require_role("SUPER_ADMIN", "TENANT_ADMIN"))])
 def get_forensics_summary(db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):

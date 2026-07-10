@@ -118,6 +118,9 @@ def render(df_risk: pd.DataFrame, tenant_id: int) -> None:
     """
     st.markdown("## 🧠 Model Explainability & Drift Monitor")
 
+    from database import active_tenant_id
+    active_tenant_id.set(tenant_id)
+
     # ── Section 1: Drift traffic lights ──────────────────────────────────────
     try:
         from services.drift_service import get_latest_drift_status

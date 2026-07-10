@@ -25,7 +25,7 @@ from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
 from config import settings
-from database import get_db
+from database import get_db, active_tenant_id
 from models import ApiKey, Merchant, User
 
 security = HTTPBearer()
@@ -118,7 +118,7 @@ def get_current_merchant(
     except (JWTError, ValueError, KeyError):
         raise exc
 
-    merchant = db.query(Merchant).filter(Merchant.id == merchant_id).first()
+    merchant = db.query(Merchant).execution_options(skip_tenant_check=True).filter(Merchant.id == merchant_id).first()
     if not merchant:
         raise exc
     if not merchant.is_active:
@@ -126,6 +126,8 @@ def get_current_merchant(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Merchant account is inactive",
         )
+        
+    active_tenant_id.set(merchant.id)
     return merchant
 
 
@@ -158,13 +160,14 @@ def get_current_user(
         raise exc
 
     # Verify tenant is still active
-    merchant = db.query(Merchant).filter(Merchant.id == tenant_id).first()
+    merchant = db.query(Merchant).execution_options(skip_tenant_check=True).filter(Merchant.id == tenant_id).first()
     if not merchant or not merchant.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Tenant account is inactive",
         )
 
+    active_tenant_id.set(tenant_id)
     return {
         "user_id":   user_id,
         "tenant_id": tenant_id,
@@ -199,6 +202,7 @@ def authenticate_user(email: str, password: str, tenant_id: int, db: Session) ->
     """
     user = (
         db.query(User)
+        .execution_options(skip_tenant_check=True) # since we haven't authenticated yet
         .filter(User.tenant_id == tenant_id, User.email == email, User.is_active == True)
         .first()
     )
@@ -228,6 +232,7 @@ def verify_api_key(
     key_hash = hashlib.sha256(api_key_value.encode()).hexdigest()
     api_key = (
         db.query(ApiKey)
+        .execution_options(skip_tenant_check=True)
         .filter(
             ApiKey.key_hash == key_hash,
             ApiKey.is_revoked == False,
@@ -249,6 +254,7 @@ def verify_api_key(
 
     # Update last_used_at (non-blocking)
     try:
+        active_tenant_id.set(api_key.tenant_id)
         api_key.last_used_at = datetime.now(timezone.utc)
         db.commit()
     except Exception:

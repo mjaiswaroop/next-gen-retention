@@ -5,8 +5,10 @@ from database import SessionLocal
 from services.agent_service import execute_agent_action, resolve_agent_action
 
 def test_agent_governance():
+    from database import active_tenant_id
     db = SessionLocal()
     tenant_id = 998
+    active_tenant_id.set(tenant_id)
     session_id = "test_session_123"
     
     try:

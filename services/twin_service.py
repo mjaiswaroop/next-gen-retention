@@ -1,3 +1,6 @@
+def retrain_customer_twin(tenant_id: int, customer_id: str):
+    import logging
+    logging.getLogger("retention_core.twin_service").info(f"Retraining twin for tenant {tenant_id} customer {customer_id}")
 
 def run_twin_simulations(tenant_id: int, customer_id: str, scenarios: list):
     import random

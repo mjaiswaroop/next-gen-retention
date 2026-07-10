@@ -4,12 +4,14 @@ from database import SessionLocal
 from services.graph_service import infer_relationships, ingest_edges
 
 def test_graph_inference():
+    from database import active_tenant_id
     db = SessionLocal()
     tenant_id = 999
+    active_tenant_id.set(tenant_id)
     
     try:
         # Setup: Create merchant
-        merchant = Merchant(id=tenant_id, name="Test Merchant", api_key="test_key_999")
+        merchant = Merchant(id=tenant_id, name=f"Test Merchant {tenant_id}", api_key=f"test_key_{tenant_id}")
         db.add(merchant)
         db.commit()
         

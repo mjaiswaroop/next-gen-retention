@@ -10,13 +10,16 @@ def render(tenant_id: int):
     
     headers = {"Authorization": f"Bearer {st.session_state.get('token', '')}"}
     
-    col1, col2 = st.columns([1, 2])
-    with col1:
-        target_audience = st.text_input("Target Audience", placeholder="e.g. Customers who haven't logged in for 30 days")
-    with col2:
-        base_prompt = st.text_area("Base Offer / Idea", height=100, placeholder="We are offering a free month upgrade if they come back.")
+    with st.form("ab_factory_form"):
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            target_audience = st.text_input("Target Audience", placeholder="e.g. Customers who haven't logged in for 30 days")
+        with col2:
+            base_prompt = st.text_area("Base Offer / Idea", height=100, placeholder="We are offering a free month upgrade if they come back.")
+            
+        submitted = st.form_submit_button("Generate Variants", type="primary", help="Uses an LLM agent to automatically spawn multiple variations of your base campaign (e.g., Aggressive, Empathetic, Value-Driven) tailored to this specific audience.")
         
-    if st.button("Generate Variants", type="primary", help="Uses an LLM agent to automatically spawn multiple variations of your base campaign (e.g., Aggressive, Empathetic, Value-Driven) tailored to this specific audience."):
+    if submitted:
         if not target_audience or not base_prompt:
             st.error("Please provide both an audience and a base idea.")
             return

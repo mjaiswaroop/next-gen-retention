@@ -13,6 +13,9 @@ def render(tenant_id: int):
     st.header("Live Negotiations (Autonomous Agent)")
     st.markdown("Monitor real-time generative AI negotiation sessions. The agent attempts to retain high-risk users by negotiating personalized offers based on corporate policy.")
     
+    from database import active_tenant_id
+    active_tenant_id.set(tenant_id)
+    
     headers = {"Authorization": f"Bearer {st.session_state.get('token', '')}"}
     
     # 1. Initialize a new session

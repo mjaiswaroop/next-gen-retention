@@ -37,6 +37,25 @@ class MockLLMClient:
 
 from sqlalchemy.orm import Session
 from models import EventLog
+from presidio_analyzer import AnalyzerEngine, PatternRecognizer, Pattern
+from presidio_anonymizer import AnonymizerEngine
+
+# Initialize Presidio
+analyzer = AnalyzerEngine()
+anonymizer = AnonymizerEngine()
+
+# Custom Recognizer for Internal Customer IDs
+internal_id_pattern = Pattern(name="internal_id_pattern", regex=r"CUST-\d{4,}", score=0.85)
+internal_id_recognizer = PatternRecognizer(supported_entity="INTERNAL_ID", patterns=[internal_id_pattern])
+analyzer.registry.add_recognizer(internal_id_recognizer)
+
+def scrub_pii(text: str) -> str:
+    """Scrubs PII and internal IDs from text before chunking or sending to LLMs."""
+    if not text:
+        return text
+    results = analyzer.analyze(text=text, entities=["PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER", "CREDIT_CARD", "INTERNAL_ID"], language="en")
+    anonymized_result = anonymizer.anonymize(text=text, analyzer_results=results)
+    return anonymized_result.text
 
 class HybridRAGService:
     def __init__(self, db: Session, llm_client=None):
@@ -72,7 +91,9 @@ class HybridRAGService:
                 payload = json.loads(row.payload) if row.payload else {}
                 ticket_text = payload.get("ticket_text", "Unknown ticket content")
                 resolution = payload.get("resolution_status", "open")
-                logs.append(f"[{row.timestamp}] ({resolution}) {ticket_text}")
+                
+                safe_ticket_text = scrub_pii(ticket_text)
+                logs.append(f"[{row.timestamp}] ({resolution}) {safe_ticket_text}")
             except Exception:
                 pass
         return logs
@@ -277,7 +298,9 @@ def analyze_churn_logs() -> List[Dict]:
             {'theme': 'Performance', 'percentage': '50%', 'severity': 'Critical', 'description': 'Users complain about dashboard lag since v2.0.'},
             {'theme': 'Billing', 'percentage': '37%', 'severity': 'High', 'description': 'Frustration that billing date preferences are ignored.'}
         ]
-    retrieved_context = '\n'.join([f'- {t}' for t in mock_tickets])
+    
+    scrubbed_tickets = [scrub_pii(t) for t in mock_tickets]
+    retrieved_context = '\n'.join([f'- {t}' for t in scrubbed_tickets])
     sys_prompt = 'You are an advanced Customer Success AI. Analyze the following retrieved support tickets from recently churned users. Group the complaints into major themes, estimate the percentage of tickets representing that theme, and assign a severity level. Output the results as JSON.'
     user_prompt = f'Retrieved Support Tickets:\n{retrieved_context}'
     try:
@@ -295,4 +318,37 @@ def analyze_churn_logs() -> List[Dict]:
     except Exception as e:
         logger.error(f'RAG Analysis failed: {e}')
         return []
+
+def analyze_churn_logs_stream():
+    mock_tickets = [
+        'The new dashboard update is incredibly slow. I have to wait 10 seconds for it to load.',
+        'I keep getting billed on the 1st of the month when I asked to be billed on the 15th.',
+        'Dashboard is lagging again. Unusable.',
+        'Customer service took 3 days to reply to my email about the billing date issue.',
+        'Why is the site so slow since the v2.0 release? I am cancelling.',
+        'I cannot figure out how to export my data. The UI is confusing.',
+        'Slow loading times.',
+        'Billing date is wrong again. I cannot manage my cash flow like this.'
+    ]
+    if not gemini_client or not settings.anthropic_api_key:
+        yield "LLM not configured. Mock Insights:\n\n"
+        yield "**CRITICAL | Performance (50%)**\nUsers complain about dashboard lag since v2.0.\n\n"
+        yield "**HIGH | Billing (37%)**\nFrustration that billing date preferences are ignored."
+        return
+
+    scrubbed_tickets = [scrub_pii(t) for t in mock_tickets]
+    retrieved_context = '\n'.join([f'- {t}' for t in scrubbed_tickets])
+    sys_prompt = 'You are an advanced Customer Success AI. Analyze the following retrieved support tickets from recently churned users. Group the complaints into major themes, estimate the percentage of tickets representing that theme, and assign a severity level. Output the results in beautifully formatted Markdown (use bullet points and bolding).'
+    user_prompt = f'Retrieved Support Tickets:\n{retrieved_context}'
+    try:
+        res = gemini_client.models.generate_content_stream(
+            model='gemini-2.5-flash',
+            contents=[sys_prompt + '\n\n' + user_prompt],
+            config=genai.types.GenerateContentConfig(temperature=0.4)
+        )
+        for chunk in res:
+            yield chunk.text
+    except Exception as e:
+        logger.error(f'RAG Streaming failed: {e}')
+        yield f"Error streaming RAG insights: {e}"
 

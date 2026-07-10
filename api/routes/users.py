@@ -47,3 +47,38 @@ def get_high_risk_users(
         })
         
     return result
+
+from fastapi.responses import StreamingResponse
+import io
+import csv
+
+@router.get("/export", dependencies=[Depends(require_role("SUPER_ADMIN", "TENANT_ADMIN"))])
+def export_customers_csv(db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    """
+    Streams a CSV of all customers for this tenant to handle massive datasets safely.
+    """
+    tenant_id = current_user["tenant_id"]
+    
+    def iter_csv():
+        # Using yield_per(1000) prevents loading millions of rows into memory
+        query = db.query(Customer).filter(Customer.merchant_id == tenant_id, Customer.is_deleted == False).yield_per(1000)
+        
+        # Yield header
+        header = ["user_id", "email", "churn_probability", "segment", "recency_days", "frequency", "monetary_value"]
+        yield ",".join(header) + "\n"
+        
+        for c in query:
+            row = [
+                str(c.user_id),
+                f"{c.user_id}@example.com",
+                str(c.churn_probability),
+                str(c.segment or ""),
+                str(c.recency_days),
+                str(c.frequency),
+                str(c.monetary_value)
+            ]
+            yield ",".join(row) + "\n"
+            
+    response = StreamingResponse(iter_csv(), media_type="text/csv")
+    response.headers["Content-Disposition"] = "attachment; filename=customers_export.csv"
+    return response
