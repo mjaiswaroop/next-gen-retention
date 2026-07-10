@@ -31,35 +31,8 @@ import alembic.command
 async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting Retention Core v3.0 API...")
-    alembic_cfg = alembic.config.Config("alembic.ini")
-    alembic.command.upgrade(alembic_cfg, "head")
     configure_tracing(app)
     
-    # Auto-seed database for seamless deployment
-    from database import SessionLocal
-    from models import Merchant, User
-    from auth import hash_password
-    import secrets
-    
-    db = SessionLocal()
-    try:
-        admin_exists = db.query(User).filter(User.email == "admin@retentioncore.com").first()
-        if not admin_exists:
-            logger.info("Auto-seeding default admin account...")
-            m = db.query(Merchant).filter(Merchant.name == 'Retention Core Corp').first()
-            if not m:
-                m = Merchant(name='Retention Core Corp', api_key=secrets.token_urlsafe(32), is_active=True)
-                db.add(m)
-                db.commit()
-            
-            u = User(tenant_id=m.id, email='admin@retentioncore.com', hashed_password=hash_password('admin123'), role='SUPER_ADMIN', is_active=True)
-            db.add(u)
-            db.commit()
-    except Exception as e:
-        logger.error(f"Failed to auto-seed database: {e}")
-    finally:
-        db.close()
-        
     yield
     # Shutdown
     logger.info("Shutting down Retention Core API.")
@@ -120,5 +93,13 @@ async def health_check():
 
 @app.get("/readiness")
 async def readiness_check():
-    # To do: check DB connections here
-    return {"status": "ready"}
+    from database import SessionLocal
+    from sqlalchemy import text
+    try:
+        db = SessionLocal()
+        db.execute(text("SELECT 1"))
+        db.close()
+        return {"status": "ready"}
+    except Exception as e:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=503, detail="Database not ready")

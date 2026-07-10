@@ -13,13 +13,15 @@ class Settings(BaseSettings):
     
     # Auth Settings
     secret_key: str = os.getenv("SECRET_KEY", "fallback-secret-key-for-dev")
+    if os.getenv("ENVIRONMENT", "production") == "production" and os.getenv("SECRET_KEY") is None:
+        raise ValueError("SECRET_KEY must be set in production!")
     access_token_expire_minutes: int = 1440
     
     # Storage Paths
     data_root: str = "data"
     
     # LLM & Generation Settings
-    anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")   
+    gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")   
     # ML Models
     emotion_model_device: int = int(os.getenv("EMOTION_MODEL_DEVICE", "-1"))
     

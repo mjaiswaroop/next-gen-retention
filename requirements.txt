@@ -64,3 +64,5 @@ tenacity>=8.0.0
 requests>=2.31
 httpx>=0.27           # async HTTP for outbound webhooks
 python-multipart      # FastAPI form data
+streamlit-option-menu>=0.3.6
+networkx>=3.1

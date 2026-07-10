@@ -96,7 +96,7 @@ def create_user_token(user_id: str, tenant_id: int, role: str) -> str:
 # Auth Dependencies
 # ─────────────────────────────────────────────────────────────────────────────
 
-def get_current_merchant(
+async def get_current_merchant(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db),
 ) -> Merchant:
@@ -131,7 +131,7 @@ def get_current_merchant(
     return merchant
 
 
-def get_current_user(
+async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db),
 ) -> dict:
@@ -217,7 +217,7 @@ def authenticate_user(email: str, password: str, tenant_id: int, db: Session) ->
 # API Key Authentication
 # ─────────────────────────────────────────────────────────────────────────────
 
-def verify_api_key(
+async def verify_api_key(
     api_key_value: Optional[str] = Security(api_key_header),
     db: Session = Depends(get_db),
 ) -> Optional[dict]:

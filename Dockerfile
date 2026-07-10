@@ -14,6 +14,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy source code
 COPY . /app
+RUN chmod +x prestart.sh
+RUN chmod +x start_combined.sh
 
-# The default command will be overridden by docker-compose for the different services
-CMD ["python", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+# Render provides $PORT for the web service. We use start_combined.sh to run both Streamlit and FastAPI.
+CMD ["./start_combined.sh"]

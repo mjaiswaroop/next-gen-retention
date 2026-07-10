@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: retention-core
+    env: docker
+    plan: free
+    region: ohio
+    healthCheckPath: /_stcore/health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: GEMINI_API_KEY
+        sync: false
