@@ -89,8 +89,25 @@ class CustomerRepository:
 
     def get_as_dataframe(self, merchant_id: int):
         import pandas as pd
+        import json
         query = self.db.query(Customer).filter(Customer.merchant_id == merchant_id)
         df = pd.read_sql(query.statement, query.session.bind)
+        
+        # Unpack the dynamic extra_features JSON block into native DataFrame columns
+        if not df.empty and 'extra_features' in df.columns:
+            # Safely parse JSON if it's a string (SQLite often returns strings)
+            def parse_json(x):
+                if isinstance(x, str):
+                    try: return json.loads(x)
+                    except: return {}
+                return x if isinstance(x, dict) else {}
+                
+            features_series = df['extra_features'].apply(parse_json)
+            features_df = pd.json_normalize(features_series)
+            
+            # Merge back and drop the raw JSON column
+            df = pd.concat([df.drop(columns=['extra_features']), features_df], axis=1)
+            
         return df
 
     def bulk_upsert(self, merchant_id: int, records: List[dict]):

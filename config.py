@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     # App Settings
-    app_name: str = "Retention Core API"
+    app_name: str = "Anchor API"
     environment: str = os.getenv("ENVIRONMENT", "production")
     
     # SQLAlchemy Settings (for Auth/Merchants/Core models)

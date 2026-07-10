@@ -30,15 +30,13 @@ import alembic.command
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    logger.info("Starting Retention Core v3.0 API...")
-    configure_tracing(app)
-    
+    logger.info("Starting Anchor v3.0 API...")
     yield
-    # Shutdown
-    logger.info("Shutting down Retention Core API.")
+    # Shutdown actions
+    logger.info("Shutting down Anchor API.")
 
 app = FastAPI(
-    title="Retention Core API",
+    title="Anchor API",
     version="3.0.0",
     lifespan=lifespan,
 )
@@ -68,23 +66,28 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
 app.add_middleware(RequestContextMiddleware)
 
 # Include Routers
-app.include_router(auth.router, prefix="/api/v1/auth", tags=["Auth & RBAC"])
-app.include_router(compliance.router, prefix="/api/v1/compliance", tags=["GDPR/CCPA"])
-app.include_router(bi.router, prefix="/api/v1/bi", tags=["Business Intelligence"])
-app.include_router(campaigns.router, prefix="/api/v1/campaigns", tags=["Automations"])
+from api.routes.compliance import router as compliance_router
+from api.routes.wargames import router as wargames_router
+from api.routes.forensics import router as forensics_router
+from api.routes.data import router as data_router
+
+app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
+app.include_router(users.router, prefix="/api/v1/users", tags=["Users (RBAC)"])
 app.include_router(causal.router, prefix="/api/v1/causal", tags=["Causal Engine"])
+app.include_router(predict.router, prefix="/api/v1/predict", tags=["Prediction"])
+app.include_router(priority.router, prefix="/api/v1/priority", tags=["Economic Priority"])
+app.include_router(campaigns.router, prefix="/api/v1/campaigns", tags=["Campaigns"])
+app.include_router(ab_factory.router, prefix="/api/v1/ab", tags=["A/B Testing"])
+app.include_router(bi.router, prefix="/api/v1/bi", tags=["Business Intelligence"])
+app.include_router(radar.router, prefix="/api/v1/radar", tags=["Radar (Contagion & Emotion)"])
 app.include_router(twin.router, prefix="/api/v1/twin", tags=["Digital Twin"])
-app.include_router(emotion.router, prefix="/api/v1/emotion", tags=["Emotion Risk Scoring"])
+app.include_router(autoheal.router, prefix="/api/v1/autoheal", tags=["Auto-Heal"])
 app.include_router(graph.router, prefix="/api/v1/graph", tags=["Contagion Graph"])
-app.include_router(counterfactual.router, prefix="/api/v1/counterfactual", tags=["Counterfactual Paths"])
-app.include_router(agent_ws.router, prefix="/api/v1/agent", tags=["Autonomous Agent"])
-app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
-app.include_router(forensics.router, prefix="/api/v1/forensics", tags=["Forensics"])
-app.include_router(predict.router, prefix="/api/v1/predict", tags=["Predict"])
-app.include_router(priority.router, prefix="/api/v1/priority", tags=["Priority Queue"])
-app.include_router(autoheal.router, prefix="/api/v1/autoheal", tags=["Auto Heal"])
-app.include_router(wargames.router, prefix="/api/v1/wargames", tags=["War Games"])
-app.include_router(ab_factory.router, prefix="/api/v1/ab_factory", tags=["AB Factory"])
+app.include_router(emotion.router, prefix="/api/v1/emotion", tags=["Emotion Detection"])
+app.include_router(compliance_router, prefix="/api/v1/compliance", tags=["Compliance"])
+app.include_router(wargames_router, prefix="/api/v1/wargames", tags=["Wargames"])
+app.include_router(forensics_router, prefix="/api/v1/forensics", tags=["Churn Forensics"])
+app.include_router(data_router, prefix="/api/v1/data", tags=["Data Ingestion"])
 app.include_router(radar.router, prefix="/api/v1/radar", tags=["Radar"])
 
 @app.get("/health")

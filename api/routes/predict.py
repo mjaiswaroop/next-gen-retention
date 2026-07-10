@@ -50,7 +50,10 @@ def get_model_metrics(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
+    from database import active_tenant_id
     tenant_id = current_user["tenant_id"]
+    active_tenant_id.set(tenant_id)
+    
     latest_model = db.query(ModelRegistry).filter(ModelRegistry.tenant_id == tenant_id, ModelRegistry.is_active == True).order_by(ModelRegistry.created_at.desc()).first()
     
     if latest_model:

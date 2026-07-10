@@ -107,60 +107,75 @@ def load_data(merchant_id: int) -> pd.DataFrame:
 # ──────────────────────────────────────────────────────────────────────
 # 2. CHURN CLASSIFIER  (XGBoost)
 # ──────────────────────────────────────────────────────────────────────
-def train_churn_model(df: pd.DataFrame):
+def train_churn_model(df: pd.DataFrame, merchant_id: int, db: SessionLocal):
     """
-    Train an Ensemble Voting Classifier (XGBoost + Random Forest) 
-    to predict churn probability with hyperparameter tuning.
+    Train an isolated XGBoost Classifier per-tenant using their specific data contract.
+    Utilizes scale_pos_weight instead of SMOTE to support native categorical features.
     """
-    X = df[FEATURE_COLS]
+    from models import TenantConfig
+    config = db.query(TenantConfig).filter(TenantConfig.tenant_id == merchant_id).first()
+    if not config or not config.feature_schema:
+        print(f"Skipping ML for {merchant_id}: No feature schema registered.")
+        return None, []
+        
+    schema = config.feature_schema
+    all_features = []
+    cat_features = []
+    
+    # ── Map Dtypes based on Schema Contract ──────────────────────────
+    for feat in schema.get("core_features", []) + schema.get("custom_features", []):
+        fname = feat["name"]
+        if fname == "user_id": continue
+        
+        all_features.append(fname)
+        if fname not in df.columns:
+            # Handle missing data cleanly if schema out of sync
+            df[fname] = np.nan
+            
+        if feat["dtype"] == "categorical":
+            cat_features.append(fname)
+            df[fname] = df[fname].astype("category")
+        elif feat["dtype"] == "numeric":
+            df[fname] = pd.to_numeric(df[fname], errors='coerce')
+            
+    if not all_features:
+        print("No features found to train on.")
+        return None, []
+        
+    X = df[all_features]
     y = df["churned"]
 
-    from imblearn.over_sampling import SMOTE
-
-    # ── stratified train / test split ────────────────────────────────
+    # ── train / test split ───────────────────────────────────────────
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.20, random_state=42, stratify=y
     )
 
-    # ── SMOTE Over-sampling ──────────────────────────────────────────
-    smote = SMOTE(random_state=42)
-    X_resampled, y_resampled = smote.fit_resample(X_train, y_train)
+    # ── Imbalance Handling (Algorithmic) ─────────────────────────────
+    neg, pos = (y_train == 0).sum(), (y_train == 1).sum()
+    spw = neg / pos if pos > 0 else 1.0
+    print(f"\nClass balance -> Retained: {neg} | Churned: {pos} | SPW: {spw:.2f}")
 
-    neg, pos = (y_resampled == 0).sum(), (y_resampled == 1).sum()
-    print(f"\nClass balance (SMOTE) -> Retained: {neg} | Churned: {pos}")
-
-    # ── base models ──────────────────────────────────────────────────
-    xgb_base = XGBClassifier(
+    # ── XGBoost with Native Categorical Support ──────────────────────
+    model = XGBClassifier(
         eval_metric="aucpr",
         random_state=42,
         n_jobs=-1,
-    )
-    
-    rf_base = RandomForestClassifier(
-        random_state=42,
-        n_jobs=-1,
-    )
-    
-    # ── ensemble definition ──────────────────────────────────────────
-    ensemble = VotingClassifier(
-        estimators=[('xgb', xgb_base), ('rf', rf_base)],
-        voting='soft'
+        enable_categorical=True,
+        scale_pos_weight=spw
     )
     
     # ── hyperparameter tuning ────────────────────────────────────────
     param_dist = {
-        'xgb__n_estimators': [100, 200, 300],
-        'xgb__max_depth': [3, 5, 7],
-        'xgb__learning_rate': [0.01, 0.05, 0.1],
-        'rf__n_estimators': [100, 200],
-        'rf__max_depth': [5, 10, None]
+        'n_estimators': [100, 200],
+        'max_depth': [3, 5, 7],
+        'learning_rate': [0.01, 0.05, 0.1]
     }
     
-    print("\nRunning RandomizedSearchCV for Ensemble Model...")
+    print(f"\nTraining Tenant-Isolated XGBoost for Merchant {merchant_id}...")
     search = RandomizedSearchCV(
-        ensemble,
+        model,
         param_distributions=param_dist,
-        n_iter=5, # Keep it small for fast retraining 
+        n_iter=5,
         scoring='roc_auc',
         cv=3,
         random_state=42,
@@ -169,12 +184,12 @@ def train_churn_model(df: pd.DataFrame):
     )
 
     # ── training ─────────────────────────────────────────────────────
-    search.fit(X_resampled, y_resampled)
-    model = search.best_estimator_
+    search.fit(X_train, y_train)
+    best_model = search.best_estimator_
     print(f"Best params: {search.best_params_}")
 
     # ── evaluation ───────────────────────────────────────────────────
-    y_proba = model.predict_proba(X_test)[:, 1]
+    y_proba = best_model.predict_proba(X_test)[:, 1]
     y_pred = (y_proba >= 0.5).astype(int)
 
     roc_auc = roc_auc_score(y_test, y_proba)
@@ -186,40 +201,25 @@ def train_churn_model(df: pd.DataFrame):
     print(f"  PR-AUC           : {pr_auc:.4f}")
     print(f"  F1-Score         : {f1:.4f}")
     print(f"{'-' * 50}")
-    print("\nClassification Report:")
-    print(classification_report(y_test, y_pred, target_names=["Retained", "Churned"]))
-
-    # ── cross-validation sanity check ────────────────────────────────
-    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
-    cv_scores = cross_val_score(model, X, y, cv=cv, scoring="roc_auc")
-    print(f"5-Fold CV ROC-AUC  : {cv_scores.mean():.4f} +/- {cv_scores.std():.4f}")
-
+    
     # ── plots ────────────────────────────────────────────────────────
-    # For feature importances in voting classifier, we average them
-    try:
-        xgb_importances = model.named_estimators_['xgb'].feature_importances_
-        rf_importances = model.named_estimators_['rf'].feature_importances_
-        avg_importances = (xgb_importances + rf_importances) / 2
-        # Mocking an object to pass to _plot_feature_importance
-        class MockModel:
-            pass
-        mock_model = MockModel()
-        mock_model.feature_importances_ = avg_importances
-        _plot_feature_importance(mock_model, FEATURE_COLS)
-    except Exception as e:
-        print(f"Could not plot feature importances: {e}")
-        
-    _plot_roc_pr(y_test, y_proba)
+    _plot_feature_importance(best_model, all_features, merchant_id)
+    _plot_roc_pr(y_test, y_proba, merchant_id)
 
-    return model
+    return best_model, all_features
 
 
-def _plot_feature_importance(model, feature_names: list[str]) -> None:
+def _plot_feature_importance(model, feature_names: list[str], merchant_id: int) -> None:
     """Bar chart of XGBoost gain-based feature importances."""
     importances = model.feature_importances_
     idx = np.argsort(importances)
 
     fig, ax = plt.subplots(figsize=(8, 5))
+    
+    # Take top 15 features to avoid crowding if schema is huge
+    top_n = min(15, len(feature_names))
+    idx = idx[-top_n:]
+    
     ax.barh(
         [feature_names[i] for i in idx],
         importances[idx],
@@ -227,14 +227,14 @@ def _plot_feature_importance(model, feature_names: list[str]) -> None:
         edgecolor="#4338ca",
     )
     ax.set_xlabel("Importance (Gain)")
-    ax.set_title("XGBoost — Feature Importance")
+    ax.set_title(f"XGBoost — Feature Importance (Tenant {merchant_id})")
     plt.tight_layout()
-    fig.savefig(PLOT_DIR / "feature_importance.png", dpi=150)
+    fig.savefig(PLOT_DIR / f"feature_importance_{merchant_id}.png", dpi=150)
     plt.close(fig)
-    print(f"[PLOT] Feature importance plot -> {PLOT_DIR / 'feature_importance.png'}")
+    print(f"[PLOT] Feature importance plot -> {PLOT_DIR / f'feature_importance_{merchant_id}.png'}")
 
 
-def _plot_roc_pr(y_true, y_proba) -> None:
+def _plot_roc_pr(y_true, y_proba, merchant_id: int) -> None:
     """Side-by-side ROC and Precision-Recall curves."""
     fig, axes = plt.subplots(1, 2, figsize=(13, 5))
 
@@ -243,7 +243,7 @@ def _plot_roc_pr(y_true, y_proba) -> None:
     axes[0].plot(fpr, tpr, color="#6366f1", lw=2,
                  label=f"AUC = {roc_auc_score(y_true, y_proba):.3f}")
     axes[0].plot([0, 1], [0, 1], "--", color="grey")
-    axes[0].set(xlabel="FPR", ylabel="TPR", title="ROC Curve")
+    axes[0].set(xlabel="FPR", ylabel="TPR", title=f"ROC Curve (Tenant {merchant_id})")
     axes[0].legend(loc="lower right")
 
     # PR
@@ -338,41 +338,58 @@ def _plot_clusters(active: pd.DataFrame, seg_map: dict) -> None:
 # MAIN
 # ──────────────────────────────────────────────────────────────────────
 def main() -> None:
+    from database import active_tenant_id
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
     PLOT_DIR.mkdir(parents=True, exist_ok=True)
 
-    for merchant_id in [1, 2]:
-        print(f"\n=======================================================")
-        print(f"  TRAINING FOR MERCHANT {merchant_id}")
-        print(f"=======================================================")
-        
-        df = load_data(merchant_id)
-        if df.empty:
-            print(f"No data for merchant {merchant_id}, skipping.")
-            continue
+    db = SessionLocal()
+    try:
+        for merchant_id in [1, 2]:
+            active_tenant_id.set(merchant_id)
+            print(f"\n=======================================================")
+            print(f"  TRAINING FOR MERCHANT {merchant_id}")
+            print(f"=======================================================")
+            
+            df = load_data(merchant_id)
+            if df.empty:
+                print(f"No data for merchant {merchant_id}, skipping.")
+                continue
 
-        xgb_model = train_churn_model(df)
-        kmeans, scaler, seg_map = train_segmentation(df)
+            xgb_model, all_features = train_churn_model(df, merchant_id, db)
+            if not xgb_model:
+                continue
+                
+            kmeans, scaler, seg_map = train_segmentation(df)
 
-        df["churn_probability"] = xgb_model.predict_proba(df[FEATURE_COLS])[:, 1].round(4)
-        active_mask = df["churned"] == 0
-        seg_features_cols = ["frequency", "monetary_value", "recency_days"]
-        df.loc[active_mask, "segment"] = kmeans.predict(
-            scaler.transform(df.loc[active_mask, seg_features_cols])
-        )
-        
-        df["segment"] = df["segment"].map(
-            lambda x: x if isinstance(x, str) else (seg_map.get(int(x), "Churned") if pd.notna(x) else "Churned")
-        )
+            df["churn_probability"] = xgb_model.predict_proba(df[all_features])[:, 1].round(4)
+            active_mask = df["churned"] == 0
+            seg_features_cols = ["frequency", "monetary_value", "recency_days"]
+            df.loc[active_mask, "segment"] = kmeans.predict(
+                scaler.transform(df.loc[active_mask, seg_features_cols])
+            )
+            
+            df["segment"] = df["segment"].map(
+                lambda x: x if isinstance(x, str) else (seg_map.get(int(x), "Churned") if pd.notna(x) else "Churned")
+            )
 
-        # ── persist per-merchant models for live inference ──────────────
-        joblib.dump(xgb_model, MODEL_DIR / f"merchant_{merchant_id}_xgb.joblib")
-        print(f"[MODEL] XGBoost model -> {MODEL_DIR / f'merchant_{merchant_id}_xgb.joblib'}")
+            # ── persist per-merchant models for live inference ──────────────
+            joblib.dump(xgb_model, MODEL_DIR / f"merchant_{merchant_id}_xgb.joblib")
+            joblib.dump(kmeans, MODEL_DIR / f"merchant_{merchant_id}_kmeans.joblib")
+            joblib.dump(scaler, MODEL_DIR / f"merchant_{merchant_id}_scaler.joblib")
+            
+            # Save segment map (can be JSON)
+            with open(MODEL_DIR / f"merchant_{merchant_id}_segment_map.json", "w") as f:
+                json.dump(seg_map, f)
+                
+            print(f"[MODEL] XGBoost model -> {MODEL_DIR / f'merchant_{merchant_id}_xgb.joblib'}")
+            print(f"[MODEL] K-Means model -> {MODEL_DIR / f'merchant_{merchant_id}_kmeans.joblib'}")
 
-        write_scores_back(merchant_id, df)
-        print(f"[SAVED] Scored dataset written back to DB for merchant {merchant_id}")
+            write_scores_back(merchant_id, df)
+            print(f"[SAVED] Scored dataset written back to DB for merchant {merchant_id}")
 
-    print(f"\n[OK] Training pipeline complete.")
+        print(f"\n[OK] Training pipeline complete.")
+    finally:
+        db.close()
 
 if __name__ == "__main__":
     main()

@@ -11,6 +11,54 @@ from auth import get_current_user, require_role, authenticate_user, create_user_
 auth_router = APIRouter()
 router = auth_router
 
+@auth_router.post("/signup")
+def signup(email: str = Form(...), password: str = Form(...), company_name: str = Form(...), db: Session = Depends(get_db)):
+    """Public endpoint to create a new merchant and tenant admin."""
+    from models import Merchant, User, TenantConfig
+    from auth import hash_password
+    import secrets
+
+    # Check if merchant exists (simple check, normally more robust)
+    existing_merchant = db.query(Merchant).execution_options(skip_tenant_check=True).filter(Merchant.name == company_name).first()
+    if existing_merchant:
+        raise HTTPException(status_code=400, detail="Company name already registered")
+        
+    existing_user = db.query(User).execution_options(skip_tenant_check=True).filter(User.email == email).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    # 1. Create Merchant
+    new_merchant = Merchant(
+        name=company_name,
+        api_key=secrets.token_hex(32),
+        is_active=True
+    )
+    db.add(new_merchant)
+    db.flush() # flush to get the ID
+
+    # 2. Create User
+    new_user = User(
+        tenant_id=new_merchant.id,
+        email=email,
+        hashed_password=hash_password(password),
+        role="TENANT_ADMIN",
+        is_active=True
+    )
+    db.add(new_user)
+    
+    # 3. Create Default TenantConfig
+    config = TenantConfig(
+        tenant_id=new_merchant.id,
+        pii_fields=["email", "full_name", "phone"],
+        data_residency_region="US",
+        churn_threshold=0.75
+    )
+    db.add(config)
+    
+    db.commit()
+    
+    return {"message": "Account created successfully", "tenant_id": new_merchant.id}
+
 @auth_router.post("/login")
 def login(username: str = Form(...), password: str = Form(...), client_id: int = Form(...), db: Session = Depends(get_db)):
     """Issues user-scoped JWT for dashboard login."""

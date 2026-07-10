@@ -225,53 +225,106 @@ def page_login():
     col1, col2, col3 = st.columns([1, 1.2, 1])
     
     with col2:
-        st.markdown("<h1 style='text-align: center;'>Welcome Back</h1>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align: center; color: #A1A1AA; margin-bottom: 30px;'>Sign in to Retention Core</p>", unsafe_allow_html=True)
+        st.markdown("<h1 style='text-align: center;'>Anchor</h1>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; color: #A1A1AA; margin-bottom: 30px;'>Next-Gen Retention Platform</p>", unsafe_allow_html=True)
         
-        with st.form("login_form", border=False):
-            email = st.text_input("Email", placeholder="admin@example.com")
-            password = st.text_input("Password", type="password", placeholder="••••••••")
-            tenant_id = st.number_input("Tenant ID", min_value=1, value=1)
-            st.markdown("<br>", unsafe_allow_html=True)
-            submit = st.form_submit_button("Log In", use_container_width=True)
+        tab_login, tab_signup = st.tabs(["Log In", "Sign Up"])
+        
+        with tab_login:
+            with st.form("login_form", border=False):
+                email = st.text_input("Email", placeholder="admin@example.com")
+                password = st.text_input("Password", type="password", placeholder="••••••••")
+                tenant_id = st.number_input("Tenant ID", min_value=1, value=1)
+                st.markdown("<br>", unsafe_allow_html=True)
+                submit = st.form_submit_button("Log In", use_container_width=True)
+    
+            if submit:
+                try:
+                    resp = requests.post(
+                        f"{API_BASE}/api/v1/auth/login",
+                        data={"username": email, "password": password, "client_id": str(tenant_id)},
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        st.session_state["token"] = data["access_token"]
+                        st.session_state["role"] = data["role"]
+                        st.session_state["tenant_id"] = tenant_id
+                        st.success("Logged in successfully!")
+                        st.rerun()
+                    else:
+                        st.error("Invalid credentials.")
+                except Exception as e:
+                    st.error(f"Connection failed: {e}")
 
-        if submit:
-            try:
-                resp = requests.post(
-                    f"{API_BASE}/api/v1/auth/login",
-                    data={"username": email, "password": password, "client_id": str(tenant_id)},
-                )
-                if resp.status_code == 200:
-                    data = resp.json()
-                    st.session_state["token"] = data["access_token"]
-                    st.session_state["role"] = data["role"]
-                    st.session_state["tenant_id"] = tenant_id
-                    st.success("Logged in successfully!")
-                    st.rerun()
+        with tab_signup:
+            with st.form("signup_form", border=False):
+                company = st.text_input("Company Name", placeholder="Acme Corp")
+                signup_email = st.text_input("Work Email", placeholder="founder@acme.com")
+                signup_password = st.text_input("Password", type="password", placeholder="••••••••")
+                st.markdown("<br>", unsafe_allow_html=True)
+                signup_submit = st.form_submit_button("Create Account", use_container_width=True)
+
+            if signup_submit:
+                if not company or not signup_email or not signup_password:
+                    st.error("Please fill all fields.")
                 else:
-                    st.error("Invalid credentials.")
-            except Exception as e:
-                st.error(f"Connection failed: {e}")
+                    try:
+                        resp = requests.post(
+                            f"{API_BASE}/api/v1/auth/signup",
+                            data={"email": signup_email, "password": signup_password, "company_name": company},
+                        )
+                        if resp.status_code == 200:
+                            data = resp.json()
+                            st.success(f"Account created! Your Tenant ID is **{data['tenant_id']}**. Please log in from the Log In tab.")
+                        else:
+                            st.error(f"Failed to sign up: {resp.json().get('detail', 'Unknown error')}")
+                    except Exception as e:
+                        st.error(f"Connection failed: {e}")
 
 def main():
-    st.set_page_config(page_title="Retention Core Dashboard", layout="wide", page_icon="📈")
+    st.set_page_config(page_title="Anchor Dashboard", layout="wide", page_icon="📈")
     
     # Inject Custom CSS for Premium Minimalist Dark Theme
     st.markdown("""
         <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Newsreader:opsz,wght@6..72,400;6..72,600&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;500;600;700&display=swap');
         
         /* Global Background & Font */
         .stApp {
             background-color: #0A0A0A !important;
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+            font-family: 'Roboto Condensed', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
             color: #EDEDED !important;
             line-height: 1.6;
         }
 
+        /* Uppercase styling */
+        .stApp, .stApp p, .stApp h1, .stApp h2, .stApp h3, .stApp span, .stApp label, .stApp button, .stApp div, .stMarkdown {
+            text-transform: uppercase !important;
+        }
+        
+        /* Protect Inputs and Code */
+        input, textarea, code, pre, .stDataFrame {
+            text-transform: none !important;
+        }
+
+        /* Smooth Entrance Animations */
+        @keyframes smoothFadeIn {
+            0% { opacity: 0; transform: translateY(20px); filter: blur(2px); }
+            100% { opacity: 1; transform: translateY(0); filter: blur(0); }
+        }
+        
+        .block-container > div {
+            animation: smoothFadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+        .block-container > div:nth-child(1) { animation-delay: 0.0s; }
+        .block-container > div:nth-child(2) { animation-delay: 0.1s; }
+        .block-container > div:nth-child(3) { animation-delay: 0.2s; }
+        .block-container > div:nth-child(4) { animation-delay: 0.3s; }
+
+
         /* Headings - Editorial Serif for Headers */
         h1, h2, h3 {
-            font-family: 'Newsreader', 'Playfair Display', serif !important;
+            font-family: 'Roboto Condensed', sans-serif !important;
             font-weight: 600 !important;
             color: #EDEDED !important;
             letter-spacing: -0.02em !important;
@@ -300,7 +353,7 @@ def main():
         /* Metric Values */
         [data-testid="stMetricValue"] {
             color: #EDEDED !important;
-            font-family: 'Inter', sans-serif !important;
+            font-family: 'Roboto Condensed', sans-serif !important;
             font-weight: 600 !important;
             font-size: 2.25rem !important;
             letter-spacing: -0.02em !important;
@@ -322,7 +375,7 @@ def main():
             border: none !important;
             border-radius: 6px !important;
             color: #0A0A0A !important;
-            font-family: 'Inter', sans-serif !important;
+            font-family: 'Roboto Condensed', sans-serif !important;
             font-weight: 500 !important;
             font-size: 0.95rem !important;
             padding: 0.6rem 1.2rem !important;
@@ -355,6 +408,11 @@ def main():
             border-top: 1px solid #333333 !important;
             margin: 2.5rem 0 !important;
         }
+
+        /* Fix Password Eye Icon Overlap */
+        div[data-testid="InputInstructions"] {
+            display: none !important;
+        }
         </style>
     """, unsafe_allow_html=True)
 
@@ -374,13 +432,16 @@ def main():
         """, unsafe_allow_html=True)
 
         from streamlit_option_menu import option_menu
+        from components.tab_data_ingestion import render_data_ingestion
         
         # Determine available pages based on role
-        all_pages = ["Predict", "Explainability", "Forensics", "BI Reports", "Automations", "Simulators", "Auto-Heal", "Admin"]
-        icons = ["graph-up", "brain", "search", "bar-chart", "robot", "cpu", "wrench", "shield-lock"]
+        all_pages = ["Predict", "Explainability", "Forensics", "BI Reports", "Automations", "Simulators", "Auto-Heal", "Admin", "Data Ingestion"]
+        icons = ["graph-up", "brain", "search", "bar-chart", "robot", "cpu", "wrench", "shield-lock", "database"]
         if role not in ("SUPER_ADMIN", "TENANT_ADMIN"):
             all_pages.remove("Admin")
             icons.remove("shield-lock")
+            all_pages.remove("Data Ingestion")
+            icons.remove("database")
 
         # Top Horizontal Navigation Bar
         selected_main = option_menu(
@@ -453,6 +514,7 @@ def main():
             if selected_sub == "Workflows": page_automations()
             elif selected_sub == "A/B Factory": tab_ab_factory.render(tenant_id)
         elif selected_main == "Auto-Heal": tab_autoheal.render(tenant_id)
+        elif selected_main == "Data Ingestion": render_data_ingestion()
 
         # Top Right corner status (Tenant ID and Logout)
         col1, col2, col3 = st.columns([8, 1, 1])

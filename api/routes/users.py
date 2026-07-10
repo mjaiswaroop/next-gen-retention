@@ -18,7 +18,9 @@ def get_high_risk_users(
     Returns a list of customers whose churn probability is >= threshold.
     Returns limited PII based on role, but always returns user_id and churn_probability.
     """
+    from database import active_tenant_id
     tenant_id = current_user["tenant_id"]
+    active_tenant_id.set(tenant_id)
     
     customers = (
         db.query(Customer)
@@ -33,7 +35,7 @@ def get_high_risk_users(
     # Format the response to match dashboard expectations
     result = []
     for c in customers:
-        result.append({
+        base_dict = {
             "user_id": c.user_id,
             "email": f"{c.user_id}@example.com", # Mock email for UI
             "churn_probability": c.churn_probability,
@@ -44,7 +46,15 @@ def get_high_risk_users(
             "session_failures": c.session_failures,
             "payment_friction_index": c.payment_friction_index,
             "active_support_tickets": c.active_support_tickets,
-        })
+        }
+        
+        # Merge in dynamic schema columns so the dashboard renders them!
+        if c.extra_features and isinstance(c.extra_features, dict):
+            for k, v in c.extra_features.items():
+                if k not in base_dict:
+                    base_dict[k] = v
+                    
+        result.append(base_dict)
         
     return result
 
@@ -57,7 +67,9 @@ def export_customers_csv(db: Session = Depends(get_db), current_user: dict = Dep
     """
     Streams a CSV of all customers for this tenant to handle massive datasets safely.
     """
+    from database import active_tenant_id
     tenant_id = current_user["tenant_id"]
+    active_tenant_id.set(tenant_id)
     
     def iter_csv():
         # Using yield_per(1000) prevents loading millions of rows into memory

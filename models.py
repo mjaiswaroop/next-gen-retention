@@ -71,6 +71,7 @@ class Customer(Base, MultiTenantModelMixin):
     active_support_tickets = Column(Integer, default=0, nullable=False)
     churn_probability      = Column(Float, nullable=True)
     segment                = Column(String(50), nullable=True)
+    extra_features         = Column(JSON, default=dict)
     is_deleted             = Column(Boolean, default=False, nullable=False)
     deleted_at             = Column(DateTime(timezone=True), nullable=True)
     created_at             = Column(DateTime(timezone=True), default=utc_now)
@@ -386,6 +387,7 @@ class TenantConfig(Base, MultiTenantModelMixin):
     digest_email_enabled  = Column(Boolean, default=True)
     digest_recipients     = Column(JSON, default=list)          # list of email strings
     churn_threshold       = Column(Float, default=0.75)
+    feature_schema        = Column(JSON, nullable=True)         # Strict Pydantic-enforced CSV schema
     active_template       = Column(String(8), default="A")      # 'A' or 'B' (A/B winner)
     enable_inferred_edges = Column(Boolean, default=False)
     created_at            = Column(DateTime(timezone=True), default=utc_now)
