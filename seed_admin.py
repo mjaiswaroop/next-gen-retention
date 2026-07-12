@@ -1,5 +1,5 @@
 import logging
-from database import SessionLocal
+from database import SessionLocal, engine, Base
 from models import Merchant, User
 from auth import hash_password
 import secrets
@@ -8,6 +8,10 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("retention_core.seed")
 
 def seed():
+    # Automatically create tables if they do not exist
+    logger.info("Initializing database schemas...")
+    Base.metadata.create_all(bind=engine)
+    
     db = SessionLocal()
     try:
         admin_exists = db.query(User).execution_options(skip_tenant_check=True).filter(User.email == "admin@retentioncore.com").first()
