@@ -14,6 +14,7 @@ def seed():
     
     db = SessionLocal()
     try:
+        active_tenant_id.set(1) # Set fallback context to pass initial database queries
         admin_exists = db.query(User).execution_options(skip_tenant_check=True).filter(User.email == "admin@retentioncore.com").first()
         if not admin_exists:
             logger.info("Auto-seeding default admin account...")
