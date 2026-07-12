@@ -63,7 +63,7 @@ def compute_priority_queue(tenant_id: int) -> List[Dict[str, Any]]:
             
             priority_list.append({
                 "customer_id": c.id,
-                "name": c.name,
+                "name": c.extra_features.get("name") or c.extra_features.get("full_name") or c.user_id,
                 "segment": c.segment,
                 "churn_probability": c.churn_probability,
                 "clv": clv,

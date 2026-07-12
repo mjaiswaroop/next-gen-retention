@@ -91,7 +91,8 @@ class CustomerRepository:
         import pandas as pd
         import json
         query = self.db.query(Customer).filter(Customer.merchant_id == merchant_id)
-        df = pd.read_sql(query.statement, query.session.bind)
+        with query.session.bind.connect() as conn:
+            df = pd.read_sql(query.statement, conn)
         
         # Unpack the dynamic extra_features JSON block into native DataFrame columns
         if not df.empty and 'extra_features' in df.columns:

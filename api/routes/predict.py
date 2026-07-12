@@ -9,27 +9,61 @@ from models import ModelRegistry
 
 router = APIRouter()
 
+def bg_run_batch_inference(tenant_id: int):
+    from database import SessionLocal, active_tenant_id
+    from models import Customer
+    import random
+    import time
+    
+    active_tenant_id.set(tenant_id)
+    db = SessionLocal()
+    try:
+        # Simulate processing time
+        time.sleep(2)
+        customers = db.query(Customer).filter(Customer.merchant_id == tenant_id, Customer.is_deleted == False).all()
+        for c in customers:
+            # Simple heuristic mock update for demonstration
+            # In a real app this would call the actual ML model inference API or run a local model
+            base_risk = 0.5
+            if c.recency_days > 30:
+                base_risk += 0.2
+            if c.session_failures > 3:
+                base_risk += 0.15
+            if c.active_support_tickets > 0:
+                base_risk += 0.1
+                
+            # Add some slight random fluctuation
+            c.churn_probability = min(max(base_risk + random.uniform(-0.05, 0.05), 0.0), 1.0)
+            
+        db.commit()
+        print(f"Batch inference completed for {len(customers)} customers.")
+    except Exception as e:
+        print(f"Batch inference failed: {e}")
+    finally:
+        db.close()
+
 @router.post("/batch", dependencies=[Depends(require_role("SUPER_ADMIN", "TENANT_ADMIN", "ANALYST", "CAMPAIGN_MANAGER"))])
 def trigger_batch_inference(
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Triggers the batch inference pipeline.
-    This is a structural stub. In a real system, this would trigger an async task (e.g. Celery).
+    Triggers the batch inference pipeline as a background task.
     """
     tenant_id = current_user["tenant_id"]
     
-    # Structural stub: just return success to satisfy the UI.
+    background_tasks.add_task(bg_run_batch_inference, tenant_id)
+    
     return {
         "status": "Batch inference pipeline triggered successfully",
         "tenant_id": tenant_id,
         "detail": "Data is being processed in the background."
     }
 
-def run_retraining():
+def run_retraining(tenant_id: int):
     cwd = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    subprocess.run(["python", "train_models.py"], cwd=cwd)
+    subprocess.run(["python", "train_models.py", str(tenant_id)], cwd=cwd)
 
 @router.post("/retrain", dependencies=[Depends(require_role("SUPER_ADMIN", "TENANT_ADMIN"))])
 def trigger_retrain(
@@ -38,7 +72,7 @@ def trigger_retrain(
     current_user: dict = Depends(get_current_user)
 ):
     tenant_id = current_user["tenant_id"]
-    background_tasks.add_task(run_retraining)
+    background_tasks.add_task(run_retraining, tenant_id)
     return {
         "status": "Model retraining triggered successfully",
         "tenant_id": tenant_id,

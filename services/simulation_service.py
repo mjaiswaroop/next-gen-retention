@@ -10,7 +10,7 @@ from repositories.customer_repo import CustomerRepository
 logger = logging.getLogger("retention_core.simulation")
 
 try:
-    gemini_client = genai.Client(api_key=settings.anthropic_api_key or "DUMMY")
+    gemini_client = genai.Client(api_key=settings.gemini_api_key or "DUMMY")
 except Exception as e:
     logger.warning(f"Failed to init Gemini client: {e}")
     gemini_client = None
@@ -65,7 +65,7 @@ class SimulationService:
         }
 
     def _simulate_individual(self, customer_data: dict, email_draft: str) -> dict:
-        if not gemini_client or not settings.anthropic_api_key:
+        if not gemini_client or not settings.gemini_api_key:
             # Fallback mock if LLM is unavailable
             return {
                 "opened": True,

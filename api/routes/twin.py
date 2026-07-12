@@ -20,8 +20,12 @@ def simulate_twin(payload: TwinRequest, current_user: dict = Depends(get_current
     """
     Dispatches Monte Carlo simulations asynchronously to the Celery ml_worker queue.
     """
-    task = simulate_twin_task.delay(current_user["tenant_id"], payload.customer_id, payload.scenarios)
-    return {"task_id": task.id, "status": "PENDING"}
+    # Fallback to synchronous execution since Redis is not installed
+    try:
+        result = simulate_twin_task(current_user["tenant_id"], payload.customer_id, payload.scenarios)
+        return {"task_id": "sync-task", "status": "completed", "result": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/simulate/status/{task_id}")
 def get_simulate_status(task_id: str):

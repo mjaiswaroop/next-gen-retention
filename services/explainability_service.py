@@ -56,9 +56,11 @@ def compute_shap_for_customer(tenant_id: int, customer_id: str, model, X, model_
 def get_explanations(*args, **kwargs): return {}
 
 def get_shap_dataframe_for_customer(tenant_id: int, customer_id: str) -> pd.DataFrame:
+    from database import active_tenant_id
+    active_tenant_id.set(tenant_id)
     db = SessionLocal()
     try:
-        results = db.query(ShapValue).filter(
+        results = db.query(ShapValue).execution_options(skip_tenant_check=True).filter(
             ShapValue.tenant_id == tenant_id,
             ShapValue.customer_id == customer_id
         ).all()

@@ -11,7 +11,7 @@ from services.causal_service import estimate_uplift
 logger = logging.getLogger("retention_core.ab_factory")
 
 try:
-    gemini_client = genai.Client(api_key=settings.anthropic_api_key or "DUMMY")
+    gemini_client = genai.Client(api_key=settings.gemini_api_key or "DUMMY")
 except Exception as e:
     logger.warning(f"Failed to init Gemini client: {e}")
     gemini_client = None
@@ -30,7 +30,7 @@ class CampaignOptimizerService:
 
     def generate_variants(self, base_prompt: str, target_audience: str) -> List[Dict[str, str]]:
         """Uses LLM to automatically generate 3 distinct A/B testing variants."""
-        if not gemini_client or not settings.anthropic_api_key:
+        if not gemini_client or not settings.gemini_api_key:
             # Mock fallback
             return [
                 {"subject": "We miss you!", "body": "Come back for 10% off.", "tone": "Direct"},
@@ -84,6 +84,9 @@ Generate 3 variants with entirely different psychological angles (e.g., Loss Ave
             })
             
         # Determine winner
+        if not results:
+            return {"error": "No valid variants provided for simulation"}
+            
         best_variant = max(results, key=lambda x: x["measured_uplift"])
         
         return {

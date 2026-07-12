@@ -17,7 +17,7 @@ logger = logging.getLogger("retention_core.agent_service")
 # Ensure gemini API is available
 try:
     # Requires google-genai package
-    gemini_client = genai.Client(api_key=settings.anthropic_api_key or "DUMMY") # Actually, we should use GEMINI_API_KEY. For now we use the configured key.
+    gemini_client = genai.Client(api_key=settings.gemini_api_key or "DUMMY") # Actually, we should use GEMINI_API_KEY. For now we use the configured key.
 except Exception as e:
     logger.warning(f"Failed to init Gemini client: {e}")
     gemini_client = None
@@ -77,7 +77,7 @@ You are the Apex Enterprise Negotiation Agent. Your sole function is to evaluate
 """     
         # Call LLM
         response_data = None
-        if gemini_client and settings.anthropic_api_key:
+        if gemini_client and settings.gemini_api_key:
             try:
                 # We use gemini-2.5-flash as the standard fast reasoning model
                 res = gemini_client.models.generate_content(

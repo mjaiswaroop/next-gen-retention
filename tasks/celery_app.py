@@ -22,7 +22,7 @@ celery_app = Celery(
     include=[
         "tasks.ml_tasks",
         "tasks.integration_tasks",
-        "tasks.bi_tasks",
+        "tasks.digest_tasks",
     ],
 )
 
@@ -74,12 +74,12 @@ celery_app.conf.beat_schedule = {
     },
     # Section 9.1: Weekly cohort report (Monday 5 AM UTC)
     "weekly-cohort-report": {
-        "task": "tasks.bi_tasks.generate_weekly_cohort_report_task",
+        "task": "tasks.digest_tasks.send_weekly_digest_all_tenants",
         "schedule": crontab(hour=5, minute=0, day_of_week="monday"),
     },
     # Section 9.5: Executive digest (Monday 9 AM UTC)
     "executive-digest-weekly": {
-        "task": "tasks.bi_tasks.send_executive_digest_task",
+        "task": "tasks.digest_tasks.send_weekly_digest_all_tenants",
         "schedule": crontab(hour=9, minute=0, day_of_week="monday"),
     },
 }

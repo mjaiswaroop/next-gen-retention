@@ -6,7 +6,7 @@ API_BASE = os.getenv("API_BASE", "http://localhost:8000")
 
 def render(tenant_id: int):
     st.header("Autonomous Auto-Heal (Forensics)")
-    st.markdown("This agent constantly monitors the backend stack traces (`uvicorn_error.log`). If a crash is detected, it proposes a self-healing code patch that you can apply with one click.")
+    st.markdown("<div class='centered-subheading'>This agent constantly monitors the backend stack traces (<code>uvicorn_error.log</code>). If a crash is detected, it proposes a self-healing code patch that you can apply with one click.</div>", unsafe_allow_html=True)
     
     headers = {"Authorization": f"Bearer {st.session_state.get('token', '')}"}
     
@@ -53,7 +53,7 @@ def render(tenant_id: int):
                         st.subheader("AI Proposed Fix")
                         st.info(f"**Reasoning:** {patch_data['reasoning']}")
                         
-                        st.markdown("**New File Contents:**")
+                        st.markdown("<div class='centered-subheading'><b>New File Contents:</b></div>", unsafe_allow_html=True)
                         st.code(patch_data['fixed_code'], language="python")
                         
                         if st.button("Apply Patch & Hot Reload", type="primary", key=f"apply_{err['id']}"):

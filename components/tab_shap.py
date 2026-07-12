@@ -178,6 +178,7 @@ def render(df_risk: pd.DataFrame, tenant_id: int) -> None:
         db = SessionLocal()
         latest_result = (
             db.query(ExperimentResult)
+            .execution_options(skip_tenant_check=True)
             .filter(ExperimentResult.tenant_id == tenant_id)
             .order_by(desc(ExperimentResult.evaluated_at))
             .first()

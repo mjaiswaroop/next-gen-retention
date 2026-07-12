@@ -43,6 +43,16 @@ app = FastAPI(
 
 setup_metrics(app)
 
+from fastapi.responses import JSONResponse
+import traceback
+from fastapi import HTTPException
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    if isinstance(exc, HTTPException):
+        return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+    err_str = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+    return JSONResponse(status_code=500, content={"detail": err_str})
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -88,7 +98,7 @@ app.include_router(compliance_router, prefix="/api/v1/compliance", tags=["Compli
 app.include_router(wargames_router, prefix="/api/v1/wargames", tags=["Wargames"])
 app.include_router(forensics_router, prefix="/api/v1/forensics", tags=["Churn Forensics"])
 app.include_router(data_router, prefix="/api/v1/data", tags=["Data Ingestion"])
-app.include_router(radar.router, prefix="/api/v1/radar", tags=["Radar"])
+app.include_router(counterfactual.router, prefix="/api/v1/counterfactual", tags=["Save Path Counterfactuals"])
 
 @app.get("/health")
 async def health_check():

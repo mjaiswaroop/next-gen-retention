@@ -6,7 +6,7 @@ API_BASE = os.getenv("API_BASE", "http://localhost:8000")
 
 def render(tenant_id: int):
     st.header("Autonomous A/B Testing Factory")
-    st.markdown("Let the AI generate 3 unique variants of your campaign, automatically run a micro-test on a small cohort, measure causal uplift, and deploy the winner.")
+    st.markdown("<div class='centered-subheading'>Let the AI generate 3 unique variants of your campaign, automatically run a micro-test on a small cohort, measure causal uplift, and deploy the winner.</div>", unsafe_allow_html=True)
     
     headers = {"Authorization": f"Bearer {st.session_state.get('token', '')}"}
     

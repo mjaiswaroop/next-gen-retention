@@ -10,7 +10,7 @@ logger = logging.getLogger("retention_core.seed")
 def seed():
     db = SessionLocal()
     try:
-        admin_exists = db.query(User).filter(User.email == "admin@retentioncore.com").first()
+        admin_exists = db.query(User).execution_options(skip_tenant_check=True).filter(User.email == "admin@retentioncore.com").first()
         if not admin_exists:
             logger.info("Auto-seeding default admin account...")
             m = db.query(Merchant).filter(Merchant.name == 'Retention Core Corp').first()

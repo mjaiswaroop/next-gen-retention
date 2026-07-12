@@ -56,7 +56,11 @@ def render(tenant_id: int):
             
             st.markdown("<br>", unsafe_allow_html=True)
             
-            if st.button("Run Monte Carlo Simulations", help="Spawns 500 parallel universe simulations branching from this customer's current state to probabilistically determine which sequence of future actions leads to the lowest churn risk."):
+            _, btn_col, _ = st.columns([1, 2, 1])
+            with btn_col:
+                run_pressed = st.button("Run Monte Carlo Simulations", help="Spawns 500 parallel universe simulations branching from this customer's current state to probabilistically determine which sequence of future actions leads to the lowest churn risk.", use_container_width=True)
+                
+            if run_pressed:
                 payload = {
                     "customer_id": selected_cid,
                     "scenarios": ["no_intervention", "discount_15", "product_fix"]
@@ -64,8 +68,15 @@ def render(tenant_id: int):
                 t_resp = requests.post(f"{API_BASE}/api/v1/twin/simulate", json=payload, headers=headers)
                 
                 if t_resp.status_code == 200:
-                    st.session_state.active_twin_task_id = t_resp.json()["task_id"]
-                    st.session_state.twin_simulation_result = None
+                    data = t_resp.json()
+                    if data.get("status") == "completed":
+                        # Backend ran synchronously (no Redis/Celery)
+                        st.session_state.active_twin_task_id = None
+                        st.session_state.twin_simulation_result = data.get("result")
+                        st.rerun()
+                    else:
+                        st.session_state.active_twin_task_id = data["task_id"]
+                        st.session_state.twin_simulation_result = None
                 else:
                     st.error(f"Simulation failed to start: {t_resp.text}")
                     
@@ -77,13 +88,26 @@ def render(tenant_id: int):
                 st.success(f"Simulations Complete using {data.get('model_type', 'LSTM')} model.")
                 st.subheader(f"Recommended Action: `{data.get('recommended_action', 'Unknown')}`")
                 
+                simulations = data.get("simulations", [])
                 sim_data = []
-                for sim in data.get("simulations", []):
+                
+                st.markdown("<br>", unsafe_allow_html=True)
+                cols = st.columns(len(simulations) if simulations else 1)
+                
+                for i, sim in enumerate(simulations):
                     samples = np.random.normal(sim["p_churn_mean"], sim["p_churn_std"], 500)
                     samples = np.clip(samples, 0, 1)
                     for s in samples:
                         sim_data.append({"Scenario": sim["scenario"], "Simulated Churn Prob": s})
-                    st.write(f"**{sim['scenario']}**: Mean P(Churn)={sim['p_churn_mean']:.3f}, ROI={sim['expected_roi']:.2f}x")
+                        
+                    roi_color = "#4ade80" if sim['expected_roi'] > 1.5 else "#facc15" if sim['expected_roi'] > 0.8 else "#f87171"
+                    cols[i].markdown(f"""
+                    <div style='background-color: #111; border: 1px solid #333; padding: 20px; border-radius: 12px; text-align: center; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);'>
+                        <p style='color: #A1A1AA; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 1.5px; margin-bottom: 8px;'>{sim['scenario'].replace("_", " ")}</p>
+                        <div style='color: #EDEDED; font-size: 2.2rem; font-weight: 700; margin-bottom: 4px;'>{sim['p_churn_mean']:.3f}</div>
+                        <div style='color: {roi_color}; font-size: 0.95rem; font-weight: 600; text-transform: uppercase;'>{sim['expected_roi']:.2f}x ROI</div>
+                    </div>
+                    """, unsafe_allow_html=True)
                     
                 df_plot = pd.DataFrame(sim_data)
                 fig = px.violin(df_plot, y="Simulated Churn Prob", color="Scenario", box=True, points="all")

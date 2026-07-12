@@ -55,9 +55,10 @@ def signup(email: str = Form(...), password: str = Form(...), company_name: str 
     )
     db.add(config)
     
+    tenant_id = new_merchant.id
     db.commit()
     
-    return {"message": "Account created successfully", "tenant_id": new_merchant.id}
+    return {"message": "Account created successfully", "tenant_id": tenant_id}
 
 @auth_router.post("/login")
 def login(username: str = Form(...), password: str = Form(...), client_id: int = Form(...), db: Session = Depends(get_db)):

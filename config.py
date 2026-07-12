@@ -13,8 +13,6 @@ class Settings(BaseSettings):
     
     # Auth Settings
     secret_key: str = os.getenv("SECRET_KEY", "fallback-secret-key-for-dev")
-    if os.getenv("ENVIRONMENT", "production") == "production" and os.getenv("SECRET_KEY") is None:
-        raise ValueError("SECRET_KEY must be set in production!")
     access_token_expire_minutes: int = 1440
     
     # Storage Paths

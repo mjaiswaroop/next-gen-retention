@@ -6,7 +6,7 @@ API_BASE = os.getenv("API_BASE", "http://localhost:8000")
 
 def render(tenant_id: int):
     st.header("War Games: Multi-Agent Campaign Simulation")
-    st.markdown("Test your retention campaigns against AI personas built from real customer telemetry before you hit send.")
+    st.markdown("<div class='centered-subheading'>Test your retention campaigns against AI personas built from real customer telemetry before you hit send.</div>", unsafe_allow_html=True)
     
     headers = {"Authorization": f"Bearer {st.session_state.get('token', '')}"}
     

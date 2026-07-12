@@ -61,8 +61,10 @@ def stream_data():
         db = SessionLocal()
         try:
             total_injected = 0
-            for merchant_id in MERCHANTS:
-                customers = generate_batch(merchant_id, size=random.randint(1, 5))
+            from models import Merchant
+            active_merchants = db.query(Merchant).filter(Merchant.is_active == True).all()
+            for m in active_merchants:
+                customers = generate_batch(m.id, size=random.randint(1, 5))
                 db.add_all(customers)
                 total_injected += len(customers)
                 

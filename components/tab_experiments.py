@@ -15,7 +15,7 @@ def render(tenant_id: int):
     headers = {"Authorization": f"Bearer {st.session_state.get('token', '')}"}
     
     st.info("A/B experimentation logic implemented in ML Lifecycle module.")
-    st.markdown("Use this tab to monitor assignment distribution and Chi-Squared significance for your active win-back experiments.")
+    st.markdown("<div class='centered-subheading'>Use this tab to monitor assignment distribution and Chi-Squared significance for your active win-back experiments.</div>", unsafe_allow_html=True)
     
     # Placeholder for fetching experiment data since we focused on backend logic earlier
     data = [

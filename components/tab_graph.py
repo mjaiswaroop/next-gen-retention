@@ -154,7 +154,7 @@ def generate_network_plot(nodes_data, links_data):
 
 def render(tenant_id: int):
     st.header("Social Contagion Network")
-    st.markdown("Monitor how churn risk propagates through B2B teams and referral networks via Independent Cascade modeling.")
+    st.markdown("<div class='centered-subheading'>Monitor how churn risk propagates through B2B teams and referral networks via Independent Cascade modeling.</div>", unsafe_allow_html=True)
     
     headers = {"Authorization": f"Bearer {st.session_state.get('token', '')}"}
     
@@ -214,7 +214,7 @@ def render(tenant_id: int):
                 st.plotly_chart(fig, use_container_width=True)
             
             st.subheader("Top Risk Nodes (Centrality & Cascade Effect)")
-            st.markdown("Nodes with highest cascade risk score.")
+            st.markdown("<div class='centered-subheading'>Nodes with highest cascade risk score.</div>", unsafe_allow_html=True)
             
             if not df.empty:
                 # Format DataFrame for display

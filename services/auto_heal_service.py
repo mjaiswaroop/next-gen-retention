@@ -12,7 +12,7 @@ from google import genai
 logger = logging.getLogger("retention_core.autoheal")
 
 try:
-    gemini_client = genai.Client(api_key=settings.anthropic_api_key or "DUMMY")
+    gemini_client = genai.Client(api_key=settings.gemini_api_key or "DUMMY")
 except Exception as e:
     logger.warning(f"Failed to init Gemini client: {e}")
     gemini_client = None
@@ -73,7 +73,7 @@ class AutoHealService:
 
     def generate_patch(self, target_file: str, traceback_str: str) -> Optional[Dict[str, Any]]:
         """Sends the broken code and stack trace to LLM for a fix."""
-        if not gemini_client or not settings.anthropic_api_key:
+        if not gemini_client or not settings.gemini_api_key:
             raise ValueError("Gemini API key not configured.")
             
         if not target_file or not os.path.exists(target_file):

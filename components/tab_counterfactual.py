@@ -25,7 +25,12 @@ def render(tenant_id: int):
             customer_opts = {c["user_id"]: f"{c['email']} (Score: {c['churn_probability']})" for c in customers}
             selected_cid = st.selectbox("Select Customer to Advise", options=list(customer_opts.keys()), format_func=lambda x: customer_opts[x])
             
-            if st.button("Generate Save Paths"):
+            st.markdown("<br>", unsafe_allow_html=True)
+            _, btn_col, _ = st.columns([1, 2, 1])
+            with btn_col:
+                generate_pressed = st.button("Generate Save Paths", use_container_width=True)
+                
+            if generate_pressed:
                 with st.spinner("Running DiCE Genetic Search algorithm..."):
                     payload = {"customer_id": selected_cid, "max_counterfactuals": 5}
                     cf_resp = requests.post(f"{API_BASE}/api/v1/counterfactual/generate", json=payload, headers=headers)
@@ -35,14 +40,14 @@ def render(tenant_id: int):
                         cfs = data.get("counterfactuals", [])
                         
                         if not cfs:
-                            st.warning("DiCE could not find feasible counterfactuals under the current constraints.")
+                            st.markdown("<div style='text-align: center; padding: 15px; border-radius: 8px; background-color: rgba(255, 204, 0, 0.1); border: 1px solid rgba(255, 204, 0, 0.3); color: #eab308; font-weight: bold;'>DiCE could not find feasible counterfactuals under the current constraints.</div>", unsafe_allow_html=True)
                         else:
                             st.success(f"Generated {len(cfs)} diverse counterfactual save paths.")
                             
                             for idx, cf in enumerate(cfs):
                                 with st.expander(f"Path #{idx+1} — {cf['recommended_action']} (Est. Cost: ${cf['cost_usd']})", expanded=(idx==0)):
                                     st.markdown("### Action Plan Overview")
-                                    st.markdown("This path outlines the optimal changes needed to retain this customer and where this intervention should be routed.")
+                                    st.markdown("<div class='centered-subheading'>This path outlines the optimal changes needed to retain this customer and where this intervention should be routed.</div>", unsafe_allow_html=True)
                                     
                                     col1, col2, col3 = st.columns(3)
                                     col1.metric(

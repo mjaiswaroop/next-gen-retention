@@ -268,7 +268,7 @@ from google import genai
 logger = logging.getLogger('retention_core.rag')
 
 try:
-    gemini_client = genai.Client(api_key=settings.anthropic_api_key or 'DUMMY')
+    gemini_client = genai.Client(api_key=settings.gemini_api_key or 'DUMMY')
 except Exception as e:
     logger.warning(f'Failed to init Gemini client: {e}')
     gemini_client = None
@@ -293,7 +293,7 @@ def analyze_churn_logs() -> List[Dict]:
         'Slow loading times.',
         'Billing date is wrong again. I cannot manage my cash flow like this.'
     ]
-    if not gemini_client or not settings.anthropic_api_key:
+    if not gemini_client or not settings.gemini_api_key:
         return [
             {'theme': 'Performance', 'percentage': '50%', 'severity': 'Critical', 'description': 'Users complain about dashboard lag since v2.0.'},
             {'theme': 'Billing', 'percentage': '37%', 'severity': 'High', 'description': 'Frustration that billing date preferences are ignored.'}
@@ -330,7 +330,7 @@ def analyze_churn_logs_stream():
         'Slow loading times.',
         'Billing date is wrong again. I cannot manage my cash flow like this.'
     ]
-    if not gemini_client or not settings.anthropic_api_key:
+    if not gemini_client or not settings.gemini_api_key:
         yield "LLM not configured. Mock Insights:\n\n"
         yield "**CRITICAL | Performance (50%)**\nUsers complain about dashboard lag since v2.0.\n\n"
         yield "**HIGH | Billing (37%)**\nFrustration that billing date preferences are ignored."

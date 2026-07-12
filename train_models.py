@@ -338,13 +338,27 @@ def _plot_clusters(active: pd.DataFrame, seg_map: dict) -> None:
 # MAIN
 # ──────────────────────────────────────────────────────────────────────
 def main() -> None:
+    import sys
     from database import active_tenant_id
+    from models import Merchant
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
     PLOT_DIR.mkdir(parents=True, exist_ok=True)
 
     db = SessionLocal()
     try:
-        for merchant_id in [1, 2]:
+        # Determine merchant IDs to train
+        if len(sys.argv) > 1:
+            try:
+                merchant_ids = [int(sys.argv[1])]
+            except ValueError:
+                print(f"Invalid merchant ID: {sys.argv[1]}")
+                return
+        else:
+            # Query all active merchants in the database
+            merchants = db.query(Merchant).filter(Merchant.is_active == True).all()
+            merchant_ids = [m.id for m in merchants]
+
+        for merchant_id in merchant_ids:
             active_tenant_id.set(merchant_id)
             print(f"\n=======================================================")
             print(f"  TRAINING FOR MERCHANT {merchant_id}")

@@ -13,7 +13,7 @@ API_BASE = os.getenv("API_BASE", "http://localhost:8000")
 
 def render(tenant_id: int):
     st.header("Emotion-Aware Risk Timeline")
-    st.markdown("Monitor rolling EWMA emotional deterioration from support tickets using Transformer-based NLP.")
+    st.markdown("<div class='centered-subheading'>Monitor rolling EWMA emotional deterioration from support tickets using Transformer-based NLP.</div>", unsafe_allow_html=True)
     
     headers = {"Authorization": f"Bearer {st.session_state.get('token', '')}"}
     
@@ -46,7 +46,7 @@ def render(tenant_id: int):
     
     # 2. View Timeline
     st.subheader("Customer Timeline (Mock Data for UI)")
-    st.markdown("This timeline tracks the *emotion_churn_signal* (7-day EWMA) over the past 90 days.")
+    st.markdown("<div class='centered-subheading'>This timeline tracks the <i>emotion_churn_signal</i> (7-day EWMA) over the past 90 days.</div>", unsafe_allow_html=True)
     
     # Generate mock EWMA timeline data
     dates = pd.date_range(end=datetime.now(timezone.utc), periods=90, freq='D')

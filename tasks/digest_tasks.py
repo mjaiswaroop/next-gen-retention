@@ -27,6 +27,8 @@ def send_weekly_digest_all_tenants() -> dict:
         active_tenants = db.query(Merchant).filter(Merchant.is_active == True).all()
 
         for tenant in active_tenants:
+            from database import active_tenant_id
+            active_tenant_id.set(tenant.id)
             # Get the tenant's admin email (fallback to first user if no explicitly marked admin)
             admin = (
                 db.query(User)

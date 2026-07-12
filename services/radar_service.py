@@ -9,7 +9,7 @@ from google import genai
 logger = logging.getLogger("retention_core.radar")
 
 try:
-    gemini_client = genai.Client(api_key=settings.anthropic_api_key or "DUMMY")
+    gemini_client = genai.Client(api_key=settings.gemini_api_key or "DUMMY")
 except Exception as e:
     logger.warning(f"Failed to init Gemini client: {e}")
     gemini_client = None
@@ -30,7 +30,7 @@ class RadarService:
         Simulates an autonomous agent scraping the web for competitor news,
         cross-referencing it with our internal churn reasons, and generating alerts.
         """
-        if not gemini_client or not settings.anthropic_api_key:
+        if not gemini_client or not settings.gemini_api_key:
             return [{
                 "competitor_name": "RivalCorp",
                 "threat_level": "High",

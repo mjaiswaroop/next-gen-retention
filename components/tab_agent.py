@@ -11,7 +11,7 @@ API_BASE = os.getenv("API_BASE", "http://localhost:8000")
 
 def render(tenant_id: int):
     st.header("Live Negotiations (Autonomous Agent)")
-    st.markdown("Monitor real-time generative AI negotiation sessions. The agent attempts to retain high-risk users by negotiating personalized offers based on corporate policy.")
+    st.markdown("<div class='centered-subheading'>Monitor real-time generative AI negotiation sessions. The agent attempts to retain high-risk users by negotiating personalized offers based on corporate policy.</div>", unsafe_allow_html=True)
     
     from database import active_tenant_id
     active_tenant_id.set(tenant_id)
@@ -93,7 +93,7 @@ def render(tenant_id: int):
 
     # 4. Agent Governance & Approvals
     st.subheader("Agent Governance & Approvals")
-    st.markdown("Review actions proposed by the autonomous agent that require human approval.")
+    st.markdown("<div class='centered-subheading'>Review actions proposed by the autonomous agent that require human approval.</div>", unsafe_allow_html=True)
     
     try:
         pending_resp = requests.get(f"{API_BASE}/api/v1/agent/actions/pending", headers=headers)
