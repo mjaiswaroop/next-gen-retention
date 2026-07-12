@@ -1,18 +1,51 @@
 services:
+  # 1. FastAPI Web Server (Backend API)
   - type: web
-    name: retention-core
-    env: docker
+    name: anchor-api
+    env: python
     plan: free
-    region: ohio
-    healthCheckPath: /_stcore/health
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
     envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: anchor-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: anchor-redis
+          property: connectionString
       - key: ENVIRONMENT
         value: production
+
+  # 2. Celery Worker (Background tasks)
+  - type: worker
+    name: anchor-celery-worker
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m celery -A tasks.celery_app worker --loglevel=info --pool=solo
+    envVars:
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: anchor-db
+          property: connectionString
       - key: REDIS_URL
-        sync: false
-      - key: SECRET_KEY
-        generateValue: true
-      - key: GEMINI_API_KEY
-        sync: false
+        fromService:
+          type: redis
+          name: anchor-redis
+          property: connectionString
+      - key: ENVIRONMENT
+        value: production
+
+  # 3. Redis Instance (Celery Broker)
+  - type: redis
+    name: anchor-redis
+    plan: free
+    ipAllowList: [] # Allow internal access only
+
+databases:
+  # 4. Managed PostgreSQL Database
+  - name: anchor-db
+    plan: free

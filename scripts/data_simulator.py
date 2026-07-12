@@ -8,7 +8,7 @@ import sys
 # Ensure we can import from the root directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import settings
-from database import SessionLocal
+from database import SessionLocal, active_tenant_id
 from models import Customer
 
 MERCHANTS = [1, 2] # Map to Merchant A and Merchant B in the DB
@@ -62,13 +62,14 @@ def stream_data():
         try:
             total_injected = 0
             from models import Merchant
-            active_merchants = db.query(Merchant).filter(Merchant.is_active == True).all()
+            active_merchants = db.query(Merchant).execution_options(skip_tenant_check=True).filter(Merchant.is_active == True).all()
             for m in active_merchants:
+                active_tenant_id.set(m.id)
                 customers = generate_batch(m.id, size=random.randint(1, 5))
                 db.add_all(customers)
+                db.commit()
                 total_injected += len(customers)
                 
-            db.commit()
             print(f"[{time.strftime('%X')}] ⚡ INJECTED {total_injected} telemetry logs into SQL database.")
             time.sleep(3) # Stream new data every 3 seconds
         except KeyboardInterrupt:
