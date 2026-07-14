@@ -11,3 +11,5 @@ services:
         value: "postgresql://postgres:password@db.supabase.co:5432/postgres" # Example placeholder, user will replace with their Supabase connection string
       - key: ENVIRONMENT
         value: production
+      - key: PYTHON_VERSION
+        value: 3.12.1
