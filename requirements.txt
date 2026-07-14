@@ -37,7 +37,7 @@ confluent-kafka>=2.3  # Section 2.1: Kafka/Redpanda consumer
 # ─── Dashboard ─────────────────────────────────────────────────────────────
 streamlit>=1.28
 plotly>=5.18
-st-aggrid>=0.3.4
+streamlit-aggrid>=0.3.4
 
 # ─── Observability ─────────────────────────────────────────────────────────
 structlog>=24.1       # Section 7.1: Structured JSON logging
