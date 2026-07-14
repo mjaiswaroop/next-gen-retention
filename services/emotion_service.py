@@ -15,15 +15,14 @@ import numpy as np
 from config import settings
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
-# PyTorch constraint inherited by Transformers
-import torch
-torch.set_num_threads(1)
-
-from transformers import pipeline
-
 logger = logging.getLogger("retention_core.emotion")
 
 try:
+    # PyTorch constraint inherited by Transformers
+    import torch
+    torch.set_num_threads(1)
+    from transformers import pipeline
+
     logger.info(f"[emotion] Loading DistilRoBERTa emotion pipeline on device {settings.emotion_model_device}...")
     emotion_classifier = pipeline(
         "text-classification", 
@@ -31,6 +30,9 @@ try:
         return_all_scores=False,
         device=settings.emotion_model_device
     )
+except ImportError:
+    logger.warning("[emotion] PyTorch or Transformers not installed. Using VADER fallback.")
+    emotion_classifier = None
 except Exception as e:
     logger.warning(f"[emotion] Failed to load remote model (using VADER fallback): {e}")
     emotion_classifier = None
