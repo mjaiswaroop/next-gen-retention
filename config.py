@@ -1,4 +1,5 @@
 import os
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
@@ -8,6 +9,11 @@ class Settings(BaseSettings):
     
     # SQLAlchemy Settings (for Auth/Merchants/Core models)
     database_url: str = os.getenv("DATABASE_URL", "sqlite:///retention_core.db")
+    
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def clean_db_url(cls, v: str) -> str:
+        return v.strip() if isinstance(v, str) else v
     pool_size: int = 5
     max_overflow: int = 10
     
